@@ -77,8 +77,11 @@ class USBEnumerator:
 
     def insert_device_details(self, device_name, device_class, device_status):
         # Insert the device details into the deviceTable
-        self.deviceTable.insert('', 'end', values=(device_name, device_class, device_status), tags=(device_status,))
-
+        if device_status == 'Suspicious':
+            self.deviceTable.insert('', 0, values=(device_name, device_class, device_status), tags=(device_status,))
+        else:
+            self.deviceTable.insert('', 'end', values=(device_name, device_class, device_status), tags=(device_status,))
+            
     def usb_enum(self, *args):        
         new_devices = self.usb_monitor.get_available_devices()
         suspicious_device_detected = False
@@ -113,7 +116,9 @@ class USBEnumerator:
 
         self.devices = new_devices
 
-        if not suspicious_device_detected and self.keystroke_monitoring_started:
+        # Check if there are any suspicious devices left
+        suspicious_devices_left = any(device['ID_USB_CLASS_FROM_DATABASE'] == 'HIDClass' for device in self.devices.values())
+        if not suspicious_devices_left and self.keystroke_monitoring_started:
             # Terminate the keystroke monitoring process
             if self.p is not None and self.p.is_alive():
                 self.p.terminate()
@@ -126,11 +131,12 @@ class KeystrokeMonitoring:
         self.speed = 0
         self.prev = -1
         self.i = 0
-        self.intrusion = False
+        self.speedIintrusion = False
         self.history = [self.limit+1] * self.size
         self.keylogged = ""
         self.keyWords = ["POWERSHELL", "CMD", "USER", "OBJECT"]
-        self.keystroke_words = False
+        self.contentIntrusion = False
+        self.notification_sent = False
 
     def KeyboardEvent(self, event):
         print("Keystroke : " + event.Key)
@@ -139,7 +145,7 @@ class KeystrokeMonitoring:
         for word in self.keyWords:
             if word in self.keylogged.upper():
                 print(f"[*] Key Words Detected: [{word}]")
-                self.keystroke_words = True
+                self.contentIntrusion = True
                 self.keylogged = ""
 
         if (self.prev == -1):
@@ -157,17 +163,20 @@ class KeystrokeMonitoring:
         print("\rAverage Typing Speed:", self.speed)
 
         if (self.speed < self.limit):
-            self.intrusion = True
+            self.speedIintrusion = True
             # do something (plan : mark device as malicious, disconnect device and add to blacklist)
         else:
-            self.intrusion = False
+            self.speedIintrusion = False
 
-        if self.intrusion:
+        if (self.speedIintrusion or self.contentIntrusion) and not self.notification_sent:
             intrusionWarning = Notify()
             intrusionWarning.title = "Intrusion Detected"
             intrusionWarning.message = "HID keystroke injection by BadUSB detected"
             intrusionWarning.icon = "warning.png"
             intrusionWarning.send()
+            self.notification_sent = True  # Set the flag to True after sending a notification
+        elif not self.speedIintrusion and not self.contentIntrusion:
+            self.notification_sent = False  # Reset the flag when the conditions are no longer met
         return True
 
     def start(self):
