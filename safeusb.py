@@ -77,8 +77,11 @@ class USBEnumerator:
 
     def insert_device_details(self, device_name, device_class, device_status):
         # Insert the device details into the deviceTable
-        self.deviceTable.insert('', 'end', values=(device_name, device_class, device_status), tags=(device_status,))
-
+        if device_status == 'Suspicious':
+            self.deviceTable.insert('', 0, values=(device_name, device_class, device_status), tags=(device_status,))
+        else:
+            self.deviceTable.insert('', 'end', values=(device_name, device_class, device_status), tags=(device_status,))
+            
     def usb_enum(self, *args):        
         new_devices = self.usb_monitor.get_available_devices()
         suspicious_device_detected = False
@@ -113,7 +116,9 @@ class USBEnumerator:
 
         self.devices = new_devices
 
-        if not suspicious_device_detected and self.keystroke_monitoring_started:
+        # Check if there are any suspicious devices left
+        suspicious_devices_left = any(device['ID_USB_CLASS_FROM_DATABASE'] == 'HIDClass' for device in self.devices.values())
+        if not suspicious_devices_left and self.keystroke_monitoring_started:
             # Terminate the keystroke monitoring process
             if self.p is not None and self.p.is_alive():
                 self.p.terminate()
