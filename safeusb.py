@@ -16,7 +16,7 @@ class App:
         #setting title
         root.title("SafeUSB")
         #setting window size
-        width=670
+        width=680
         height= 290
         screenwidth = root.winfo_screenwidth()
         screenheight = root.winfo_screenheight()
@@ -38,21 +38,29 @@ class App:
         # Pack to make visible
         tabControl.pack(expand=1, fill="both")
         
-        self.deviceTable=ttk.Treeview(self.tab1)  # Change this line
+        self.scrollbar = ttk.Scrollbar(self.tab1)
+        self.scrollbar.place(x=657,y=10,height=207)
+        self.deviceTable=ttk.Treeview(self.tab1) 
         self.deviceTable.configure(selectmode="extended", show="headings")
+        self.deviceTable.configure(yscrollcommand=self.scrollbar.set)
+        self.scrollbar.configure(command=self.deviceTable.yview)
         self.deviceTable['columns'] = ('Device Name', 'Class', 'Status')
         for col in self.deviceTable['columns']:
             self.deviceTable.heading(col, text=col)
-            self.deviceTable.column(col, width=tkFont.Font().measure(col))  # Add this line
+            self.deviceTable.column(col, width=tkFont.Font().measure(col))
         self.deviceTable.tag_configure('Safe', background='green')
         self.deviceTable.tag_configure('Suspicious', background='yellow')
         self.deviceTable.tag_configure('Malicious', background='red')
         self.deviceTable.place(x=10,y=10,width=647,height=207)
         
         # Create a button to authorize all device
+        self.authButton = ttk.Button(self.tab1)
+        self.authButton.configure(text="Authorize Selected")
+        self.authButton.place(x=10, y=230)
+        
         self.authAllButton = ttk.Button(self.tab1)
-        self.authAllButton.configure(text="Authorize Suspicious Device")
-        self.authAllButton.place(x=10, y=230)  
+        self.authAllButton.configure(text="Authorize All")
+        self.authAllButton.place(x=120, y=230)    
           
         self.usb_monitor = USBMonitor()
         self.usb_enumerator = USBEnumerator(self.deviceTable, self.usb_monitor)
@@ -65,34 +73,48 @@ class USBEnumerator:
         self.usb_monitor = usb_monitor
         self.keystroke_monitoring_started = False
         self.p = None
+        self.devices = {}  # Store the current devices
 
     def insert_device_details(self, device_name, device_class, device_status):
         # Insert the device details into the deviceTable
         self.deviceTable.insert('', 'end', values=(device_name, device_class, device_status), tags=(device_status,))
 
     def usb_enum(self, *args):        
-        # Clear the deviceTable
-        self.deviceTable.delete(*self.deviceTable.get_children())
-        devices = self.usb_monitor.get_available_devices()
+        new_devices = self.usb_monitor.get_available_devices()
         suspicious_device_detected = False
-        for key, device in devices.items():
-            # Get the device details
-            device_name = f"{device['ID_MODEL_FROM_DATABASE']}"
-            device_class = f"{device['ID_USB_CLASS_FROM_DATABASE']}"
-            # Check if the device class is 'HIDClass'
-            if device_class == 'HIDClass':
-                device_status = 'Suspicious'
-                suspicious_device_detected = True
-                if not self.keystroke_monitoring_started:
-                    keystroke_monitoring = KeystrokeMonitoring()
-                    self.p = multiprocessing.Process(target=keystroke_monitoring.start)
-                    self.p.start()
-                    self.keystroke_monitoring_started = True  
-            else:
-                device_status = 'Safe'
-            self.insert_device_details(device_name, device_class, device_status)
+
+        # Check for new devices
+        for key, device in new_devices.items():
+            if key not in self.devices:
+                # Get the device details
+                device_name = f"{device['ID_MODEL_FROM_DATABASE']}"
+                device_class = f"{device['ID_USB_CLASS_FROM_DATABASE']}"
+                # Check if the device class is 'HIDClass'
+                if device_class == 'HIDClass':
+                    device_status = 'Suspicious'
+                    suspicious_device_detected = True
+                    if not self.keystroke_monitoring_started:
+                        keystroke_monitoring = KeystrokeMonitoring()
+                        self.p = multiprocessing.Process(target=keystroke_monitoring.start)
+                        self.p.start()
+                        self.keystroke_monitoring_started = True  
+                else:
+                    device_status = 'Safe'
+                self.insert_device_details(device_name, device_class, device_status)
+
+        # Check for disconnected devices
+        for key in list(self.devices.keys()):
+            if key not in new_devices:
+                # Find the item in the deviceTable and remove it
+                for item in self.deviceTable.get_children():
+                    if self.deviceTable.item(item, "values")[0] == self.devices[key]['ID_MODEL_FROM_DATABASE']:
+                        self.deviceTable.delete(item)
+                        break
+
+        self.devices = new_devices
+
         if not suspicious_device_detected and self.keystroke_monitoring_started:
-        # Terminate the keystroke monitoring process
+            # Terminate the keystroke monitoring process
             if self.p is not None and self.p.is_alive():
                 self.p.terminate()
             self.keystroke_monitoring_started = False
