@@ -66,6 +66,26 @@ class App:
         self.usb_enumerator.usb_enum()
         self.usb_monitor.start_monitoring(on_connect=self.usb_enumerator.usb_enum, on_disconnect=self.usb_enumerator.usb_enum)
 
+    def hide_window(self):
+        runNotify = Notify()
+        runNotify.title = "SafeUSB is active"
+        runNotify.message = "SafeUSB is running in the background"
+        runNotify.icon = "information.png"
+        runNotify.send()
+        root.withdraw()
+        image=Image.open("favicon.ico")
+        menu=(item('Show', self.show_window), item('Quit', self.quit_window))
+        icon=pystray.Icon("name", image, "SafeUSB", menu)
+        icon.run()
+
+    def show_window(self, icon, item):
+        icon.stop()
+        root.after(0,lambda: root.deiconify())
+
+    def quit_window(self, icon, item):
+        icon.stop()
+        root.destroy()
+
 class USBEnumerator:
     def __init__(self, deviceTable, usb_monitor):
         self.deviceTable = deviceTable
@@ -187,29 +207,5 @@ class KeystrokeMonitoring:
 if __name__ == "__main__":
     root = tk.Tk()
     app = App(root)
-    # Define a function for quit the window
-    def quit_window(icon, item):
-        icon.stop()
-        root.destroy()
-    
-    # Define a function to show the window again
-    def show_window(icon, item):
-        icon.stop()
-        root.after(0,lambda: root.deiconify())
-    
-    # Hide the window and show on the system taskbar
-    def hide_window():
-        # ignore pylance issues
-        runNotify = Notify()
-        runNotify.title = "SafeUSB is active"
-        runNotify.message = "SafeUSB is running in the background"
-        runNotify.icon = "information.png"
-        runNotify.send()
-        root.withdraw()
-        image=Image.open("favicon.ico")
-        menu=(item('Show', show_window), item('Quit', quit_window))
-        icon=pystray.Icon("name", image, "SafeUSB", menu)
-        icon.run()
-    
-    root.protocol('WM_DELETE_WINDOW', hide_window)
+    root.protocol('WM_DELETE_WINDOW', app.hide_window)
     root.mainloop()
