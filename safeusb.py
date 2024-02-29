@@ -41,8 +41,7 @@ class App:
         self.scrollbar = ttk.Scrollbar(self.tab1)
         self.scrollbar.place(x=657,y=10,height=207)
         self.deviceTable=ttk.Treeview(self.tab1) 
-        self.deviceTable.configure(selectmode="extended", show="headings")
-        self.deviceTable.configure(yscrollcommand=self.scrollbar.set)
+        self.deviceTable = ttk.Treeview(self.tab1, selectmode="extended", show="headings", yscrollcommand=self.scrollbar.set)
         self.scrollbar.configure(command=self.deviceTable.yview)
         self.deviceTable['columns'] = ('Device Name', 'Class', 'Status')
         for col in self.deviceTable['columns']:
@@ -80,7 +79,7 @@ class USBEnumerator:
         if device_status == 'Suspicious':
             self.deviceTable.insert('', 0, values=(device_name, device_class, device_status), tags=(device_status,))
         else:
-            self.deviceTable.insert('', 'end', values=(device_name, device_class, device_status), tags=(device_status,))
+            self.deviceTable.insert('', 'end' if device_status == 'Safe' else 0, values=(device_name, device_class, device_status), tags=(device_status,))
             
     def usb_enum(self, *args):        
         new_devices = self.usb_monitor.get_available_devices()
