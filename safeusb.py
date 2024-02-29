@@ -10,6 +10,7 @@ import pyWinhook as pyHook
 import pythoncom
 import multiprocessing
 from notifypy import Notify
+import queue
 
 class App:
     def __init__(self, root):
@@ -82,8 +83,8 @@ class App:
         root.destroy()
 
 class USBEnumerator:
-    def __init__(self, deviceTable):
-        self.deviceTable = deviceTable
+    def __init__(self, queue):
+        self.queue = queue
         self.usb_monitor = USBMonitor()
         self.keystroke_monitoring_started = False
         self.p = None
@@ -91,13 +92,6 @@ class USBEnumerator:
         self.usb_enum()
         self.usb_monitor.start_monitoring(on_connect=self.usb_enum, on_disconnect=self.usb_enum)
 
-    def insert_device_details(self, device_name, device_class, device_status):
-        # Insert the device details into the deviceTable
-        if device_status == 'Suspicious':
-            self.deviceTable.insert('', 0, values=(device_name, device_class, device_status), tags=(device_status,))
-        else:
-            self.deviceTable.insert('', 'end' if device_status == 'Safe' else 0, values=(device_name, device_class, device_status), tags=(device_status,))
-            
     def usb_enum(self, *args):        
         new_devices = self.usb_monitor.get_available_devices()
 
@@ -117,16 +111,12 @@ class USBEnumerator:
                         self.keystroke_monitoring_started = True  
                 else:
                     device_status = 'Safe'
-                self.insert_device_details(device_name, device_class, device_status)
+                self.queue.put(('connect', device_name, device_class, device_status))  # Move this line here
 
         # Check for disconnected devices
         for key in list(self.devices.keys()):
             if key not in new_devices:
-                # Find the item in the deviceTable and remove it
-                for item in self.deviceTable.get_children():
-                    if self.deviceTable.item(item, "values")[0] == self.devices[key]['ID_MODEL_FROM_DATABASE']:
-                        self.deviceTable.delete(item)
-                        break
+                self.queue.put(('disconnect', self.devices[key]['ID_MODEL_FROM_DATABASE']))
 
         self.devices = new_devices
 
@@ -137,6 +127,7 @@ class USBEnumerator:
             if self.p is not None and self.p.is_alive():
                 self.p.terminate()
             self.keystroke_monitoring_started = False
+
         
 class KeystrokeMonitoring:
     def __init__(self):
@@ -202,6 +193,36 @@ class KeystrokeMonitoring:
 if __name__ == "__main__":
     root = tk.Tk()
     app = App(root)
-    usb_enumerator = USBEnumerator(app.deviceTable)
+    q = multiprocessing.Queue()
+    usb_enumerator = USBEnumerator(q)
     root.protocol('WM_DELETE_WINDOW', app.hide_window)
+    
+    # def update_gui():
+    #     while not q.empty():
+    #         device_name, device_class, device_status = q.get()
+    #         if device_status == 'Suspicious':
+    #             app.deviceTable.insert('', 0, values=(device_name, device_class, device_status), tags=(device_status,))
+    #         else:
+    #             app.deviceTable.insert('', 'end' if device_status == 'Safe' else 0, values=(device_name, device_class, device_status), tags=(device_status,))
+    #     root.after(1000, update_gui)  # Schedule the next call to this function
+
+    def update_gui():
+        while not q.empty():
+            action, *data = q.get()
+            if action == 'connect':
+                device_name, device_class, device_status = data
+                if device_status == 'Suspicious':
+                    app.deviceTable.insert('', 0, values=(device_name, device_class, device_status), tags=(device_status,))
+                else:
+                    app.deviceTable.insert('', 'end' if device_status == 'Safe' else 0, values=(device_name, device_class, device_status), tags=(device_status,))
+            elif action == 'disconnect':
+                device_name = data[0]
+                for item in app.deviceTable.get_children():
+                    if app.deviceTable.item(item, "values")[0] == device_name:
+                        app.deviceTable.delete(item)
+                        break
+        root.after(1000, update_gui)  # Schedule the next call to this function
+
+
+    update_gui()  # Start the periodic call to the function
     root.mainloop()
