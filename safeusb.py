@@ -60,11 +60,6 @@ class App:
         self.authAllButton = ttk.Button(self.tab1)
         self.authAllButton.configure(text="Authorize All")
         self.authAllButton.place(x=120, y=230)    
-          
-        self.usb_monitor = USBMonitor()
-        self.usb_enumerator = USBEnumerator(self.deviceTable, self.usb_monitor)
-        self.usb_enumerator.usb_enum()
-        self.usb_monitor.start_monitoring(on_connect=self.usb_enumerator.usb_enum, on_disconnect=self.usb_enumerator.usb_enum)
 
     def hide_window(self):
         runNotify = Notify()
@@ -87,12 +82,14 @@ class App:
         root.destroy()
 
 class USBEnumerator:
-    def __init__(self, deviceTable, usb_monitor):
+    def __init__(self, deviceTable):
         self.deviceTable = deviceTable
-        self.usb_monitor = usb_monitor
+        self.usb_monitor = USBMonitor()
         self.keystroke_monitoring_started = False
         self.p = None
         self.devices = {}  # Store the current devices
+        self.usb_enum()
+        self.usb_monitor.start_monitoring(on_connect=self.usb_enum, on_disconnect=self.usb_enum)
 
     def insert_device_details(self, device_name, device_class, device_status):
         # Insert the device details into the deviceTable
@@ -103,7 +100,6 @@ class USBEnumerator:
             
     def usb_enum(self, *args):        
         new_devices = self.usb_monitor.get_available_devices()
-        suspicious_device_detected = False
 
         # Check for new devices
         for key, device in new_devices.items():
@@ -114,7 +110,6 @@ class USBEnumerator:
                 # Check if the device class is 'HIDClass'
                 if device_class == 'HIDClass':
                     device_status = 'Suspicious'
-                    suspicious_device_detected = True
                     if not self.keystroke_monitoring_started:
                         keystroke_monitoring = KeystrokeMonitoring()
                         self.p = multiprocessing.Process(target=keystroke_monitoring.start)
@@ -207,5 +202,6 @@ class KeystrokeMonitoring:
 if __name__ == "__main__":
     root = tk.Tk()
     app = App(root)
+    usb_enumerator = USBEnumerator(app.deviceTable)
     root.protocol('WM_DELETE_WINDOW', app.hide_window)
     root.mainloop()
