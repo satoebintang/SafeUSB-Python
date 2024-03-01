@@ -89,6 +89,8 @@ class App:
 
     def quit_window(self, icon, item):
         icon.stop()
+        if usb_enumerator.p is not None and usb_enumerator.p.is_alive():
+            usb_enumerator.p.terminate()
         root.destroy()
 
 class USBEnumerator:
