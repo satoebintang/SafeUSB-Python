@@ -10,7 +10,6 @@ import pyWinhook as pyHook
 import pythoncom
 import multiprocessing
 from notifypy import Notify
-import queue
 
 class App:
     def __init__(self, root):
