@@ -137,7 +137,6 @@ class USBEnumerator:
                 self.p.terminate()
             self.keystroke_monitoring_started = False
 
-        
 class KeystrokeMonitoring:
     def __init__(self):
         self.limit = 30
