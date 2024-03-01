@@ -13,31 +13,40 @@ from notifypy import Notify
 
 class App:
     def __init__(self, root):
+        self.root = root
+        self.setup_window()
+        self.setup_tab_control()
+        self.setup_device_table()
+        self.setup_buttons()
+
+    def setup_window(self):
         #setting title
-        root.title("SafeUSB")
+        self.root.title("SafeUSB")
         #setting window size
         width=680
         height= 290
-        screenwidth = root.winfo_screenwidth()
-        screenheight = root.winfo_screenheight()
+        screenwidth = self.root.winfo_screenwidth()
+        screenheight = self.root.winfo_screenheight()
         alignstr = '%dx%d+%d+%d' % (width, height, (screenwidth - width) / 2, (screenheight - height) / 2)
-        root.geometry(alignstr)
-        root.resizable(width=False, height=False)
+        self.root.geometry(alignstr)
+        self.root.resizable(width=False, height=False)
 
+    def setup_tab_control(self):
         # Create the tab control
-        tabControl = ttk.Notebook(root)
+        self.tabControl = ttk.Notebook(self.root)
 
         # Create the tabs
-        self.tab1 = ttk.Frame(tabControl)
-        self.tab2 = ttk.Frame(tabControl)
+        self.tab1 = ttk.Frame(self.tabControl)
+        self.tab2 = ttk.Frame(self.tabControl)
 
         # Add the tabs to the tab control
-        tabControl.add(self.tab1, text='Active Devices')
-        tabControl.add(self.tab2, text='Protection History')
+        self.tabControl.add(self.tab1, text='Active Devices')
+        self.tabControl.add(self.tab2, text='Protection History')
 
         # Pack to make visible
-        tabControl.pack(expand=1, fill="both")
-        
+        self.tabControl.pack(expand=1, fill="both")
+
+    def setup_device_table(self):
         self.scrollbar = ttk.Scrollbar(self.tab1)
         self.scrollbar.place(x=657,y=10,height=207)
         self.deviceTable=ttk.Treeview(self.tab1) 
@@ -51,7 +60,8 @@ class App:
         self.deviceTable.tag_configure('Suspicious', background='yellow')
         self.deviceTable.tag_configure('Malicious', background='red')
         self.deviceTable.place(x=10,y=10,width=647,height=207)
-        
+
+    def setup_buttons(self):
         # Create a button to authorize all device
         self.authButton = ttk.Button(self.tab1)
         self.authButton.configure(text="Authorize Selected")
@@ -59,7 +69,7 @@ class App:
         
         self.authAllButton = ttk.Button(self.tab1)
         self.authAllButton.configure(text="Authorize All")
-        self.authAllButton.place(x=120, y=230)    
+        self.authAllButton.place(x=120, y=230)
 
     def hide_window(self):
         runNotify = Notify()
@@ -195,15 +205,6 @@ if __name__ == "__main__":
     q = multiprocessing.Queue()
     usb_enumerator = USBEnumerator(q)
     root.protocol('WM_DELETE_WINDOW', app.hide_window)
-    
-    # def update_gui():
-    #     while not q.empty():
-    #         device_name, device_class, device_status = q.get()
-    #         if device_status == 'Suspicious':
-    #             app.deviceTable.insert('', 0, values=(device_name, device_class, device_status), tags=(device_status,))
-    #         else:
-    #             app.deviceTable.insert('', 'end' if device_status == 'Safe' else 0, values=(device_name, device_class, device_status), tags=(device_status,))
-    #     root.after(1000, update_gui)  # Schedule the next call to this function
 
     def update_gui():
         while not q.empty():
