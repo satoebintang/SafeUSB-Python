@@ -222,6 +222,5 @@ if __name__ == "__main__":
                         break
         root.after(1000, update_gui)  # Schedule the next call to this function
 
-
     update_gui()  # Start the periodic call to the function
     root.mainloop()
