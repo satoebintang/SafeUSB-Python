@@ -62,14 +62,9 @@ class App:
         self.deviceTable.place(x=10,y=10,width=647,height=207)
 
     def setup_buttons(self):
-        # Create a button to authorize all device
         self.authButton = ttk.Button(self.tab1)
-        self.authButton.configure(text="Authorize Selected")
+        self.authButton.configure(text="Register Selected")
         self.authButton.place(x=10, y=230)
-        
-        self.authAllButton = ttk.Button(self.tab1)
-        self.authAllButton.configure(text="Authorize All")
-        self.authAllButton.place(x=120, y=230)
 
     def hide_window(self):
         runNotify = Notify()
