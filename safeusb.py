@@ -38,10 +38,12 @@ class App:
         # Create the tabs
         self.tab1 = ttk.Frame(self.tabControl)
         self.tab2 = ttk.Frame(self.tabControl)
+        self.tab3 = ttk.Frame(self.tabControl)
 
         # Add the tabs to the tab control
         self.tabControl.add(self.tab1, text='Active Devices')
-        self.tabControl.add(self.tab2, text='Protection History')
+        self.tabControl.add(self.tab2, text='Registered Device')
+        self.tabControl.add(self.tab3, text='Configuration')
 
         # Pack to make visible
         self.tabControl.pack(expand=1, fill="both")
@@ -56,8 +58,8 @@ class App:
         for col in self.deviceTable['columns']:
             self.deviceTable.heading(col, text=col)
             self.deviceTable.column(col, width=tkFont.Font().measure(col))
-        self.deviceTable.tag_configure('Safe', background='green')
-        self.deviceTable.tag_configure('Suspicious', background='yellow')
+        self.deviceTable.tag_configure('Registered', background='green')
+        self.deviceTable.tag_configure('Unregistered', background='yellow')
         self.deviceTable.tag_configure('Malicious', background='red')
         self.deviceTable.place(x=10,y=10,width=647,height=207)
 
@@ -109,14 +111,14 @@ class USBEnumerator:
                 device_class = f"{device['ID_USB_CLASS_FROM_DATABASE']}"
                 # Check if the device class is 'HIDClass'
                 if device_class == 'HIDClass':
-                    device_status = 'Suspicious'
+                    device_status = 'Unregistered'
                     if not self.keystroke_monitoring_started:
                         keystroke_monitoring = KeystrokeMonitoring()
                         self.p = multiprocessing.Process(target=keystroke_monitoring.start)
                         self.p.start()
                         self.keystroke_monitoring_started = True  
                 else:
-                    device_status = 'Safe'
+                    device_status = 'Registered'
                 self.queue.put(('connect', device_name, device_class, device_status))  # Move this line here
 
         # Check for disconnected devices
@@ -126,9 +128,9 @@ class USBEnumerator:
 
         self.devices = new_devices
 
-        # Check if there are any suspicious devices left
-        suspicious_devices_left = any(device['ID_USB_CLASS_FROM_DATABASE'] == 'HIDClass' for device in self.devices.values())
-        if not suspicious_devices_left and self.keystroke_monitoring_started:
+        # Check if there are any Unregistered devices left
+        unregistered_devices_left = any(device['ID_USB_CLASS_FROM_DATABASE'] == 'HIDClass' for device in self.devices.values())
+        if not unregistered_devices_left and self.keystroke_monitoring_started:
             # Terminate the keystroke monitoring process
             if self.p is not None and self.p.is_alive():
                 self.p.terminate()
@@ -207,10 +209,10 @@ if __name__ == "__main__":
             action, *data = q.get()
             if action == 'connect':
                 device_name, device_class, device_status = data
-                if device_status == 'Suspicious':
+                if device_status == 'Unregistered':
                     app.deviceTable.insert('', 0, values=(device_name, device_class, device_status), tags=(device_status,))
                 else:
-                    app.deviceTable.insert('', 'end' if device_status == 'Safe' else 0, values=(device_name, device_class, device_status), tags=(device_status,))
+                    app.deviceTable.insert('', 'end' if device_status == 'Registered' else 0, values=(device_name, device_class, device_status), tags=(device_status,))
             elif action == 'disconnect':
                 device_name = data[0]
                 for item in app.deviceTable.get_children():
