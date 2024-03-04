@@ -1,8 +1,9 @@
 import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.font as tkFont
+import tkinter.messagebox as messagebox
 from usbmonitor import USBMonitor
-from usbmonitor.attributes import ID_MODEL_FROM_DATABASE, ID_USB_CLASS_FROM_DATABASE
+from usbmonitor.attributes import ID_MODEL_FROM_DATABASE, ID_USB_CLASS_FROM_DATABASE, DEVNAME
 from pystray import MenuItem as item
 import pystray
 from PIL import Image
@@ -10,6 +11,7 @@ import pyWinhook as pyHook
 import pythoncom
 import multiprocessing
 from notifypy import Notify
+import os
 
 class App:
     def __init__(self, root):
@@ -17,6 +19,7 @@ class App:
         self.setup_window()
         self.setup_tab_control()
         self.setup_device_table()
+        self.setup_registered_device_table()
         self.setup_buttons()
 
     def setup_window(self):
@@ -62,11 +65,67 @@ class App:
         self.deviceTable.tag_configure('Unregistered', background='yellow')
         self.deviceTable.tag_configure('Malicious', background='red')
         self.deviceTable.place(x=10,y=10,width=647,height=207)
-
+        
+    def setup_registered_device_table(self):
+        self.scrollbar2 = ttk.Scrollbar(self.tab2)
+        self.scrollbar2.place(x=657,y=10,height=207)
+        self.registeredDeviceTable=ttk.Treeview(self.tab2) 
+        self.registeredDeviceTable = ttk.Treeview(self.tab2, selectmode="extended", show="headings", yscrollcommand=self.scrollbar2.set)
+        self.scrollbar2.configure(command=self.registeredDeviceTable.yview)
+        self.registeredDeviceTable['columns'] = ('Device Name', 'Device Class', 'Device ID')
+        for col in self.registeredDeviceTable['columns']:
+            self.registeredDeviceTable.heading(col, text=col)
+            self.registeredDeviceTable.column(col, width=tkFont.Font().measure(col))
+        self.registeredDeviceTable.place(x=10,y=10,width=647,height=207)
+        # Check if the file exists, if not, create it
+        if not os.path.isfile('registered.txt'):
+            open('registered.txt', 'w').close()
+        # Read data from "registered.txt" and insert into the table
+        with open('registered.txt', 'r') as f:
+            for line in f:
+                device_name, device_class, device_id = line.strip().split(',')
+                self.registeredDeviceTable.insert('', 'end', values=(device_name, device_class, device_id))
+                
     def setup_buttons(self):
         self.authButton = ttk.Button(self.tab1)
         self.authButton.configure(text="Register Selected")
         self.authButton.place(x=10, y=230)
+        self.authButton.configure(command=self.register_selected_devices)  # Add this line
+        
+    def register_selected_devices(self):
+        selected_items = self.deviceTable.selection()
+        if not selected_items:
+            messagebox.showwarning("Warning", "No device selected.")
+            return
+
+        # Load the registered devices from the file
+        with open('registered.txt', 'r') as f:
+            registered_devices = [line.strip().split(',') for line in f]
+
+        for item in selected_items:
+            device_name, device_class, device_status = self.deviceTable.item(item, "values")
+            if device_status == 'Registered':
+                messagebox.showwarning("Warning", f"Device {device_name} is already registered.")
+                continue
+
+            # Fetch the device ID from the USBEnumerator class
+            matching_devices = [device for device in usb_enumerator.devices.values() if device['ID_MODEL_FROM_DATABASE'] == device_name and device['ID_USB_CLASS_FROM_DATABASE'] == device_class]
+            if not matching_devices:
+                messagebox.showwarning("Warning", f"Device {device_name} not found.")
+                continue
+
+            for device in matching_devices:
+                device_id = device['DEVNAME']
+                # Check if the device is already registered
+                if any(rd[0] == device_name and rd[1] == device_class and rd[2] == device_id for rd in registered_devices):
+                    messagebox.showwarning("Warning", f"Device {device_name} is already registered.")
+                    continue
+                # Register the device
+                usb_enumerator.write_to_file(device_name, device_class, device_id)
+
+                # Update the device status in the table
+                self.deviceTable.set(item, 'Status', 'Registered')
+                self.deviceTable.item(item, tags=('Registered',))
 
     def hide_window(self):
         runNotify = Notify()
@@ -103,14 +162,22 @@ class USBEnumerator:
     def usb_enum(self, *args):        
         new_devices = self.usb_monitor.get_available_devices()
 
+        # Load the registered devices from the file
+        with open('registered.txt', 'r') as f:
+            registered_devices = [line.strip().split(',') for line in f]
+
         # Check for new devices
         for key, device in new_devices.items():
             if key not in self.devices:
                 # Get the device details
                 device_name = f"{device['ID_MODEL_FROM_DATABASE']}"
                 device_class = f"{device['ID_USB_CLASS_FROM_DATABASE']}"
-                # Check if the device class is 'HIDClass'
-                if device_class == 'HIDClass':
+                device_id = f"{device['DEVNAME']}"
+
+                # Check if the device is registered
+                if any(rd[0] == device_name and rd[1] == device_class and rd[2] == device_id for rd in registered_devices):
+                    device_status = 'Registered'
+                elif device_class == 'HIDClass':
                     device_status = 'Unregistered'
                     if not self.keystroke_monitoring_started:
                         keystroke_monitoring = KeystrokeMonitoring()
@@ -119,7 +186,9 @@ class USBEnumerator:
                         self.keystroke_monitoring_started = True  
                 else:
                     device_status = 'Registered'
-                self.queue.put(('connect', device_name, device_class, device_status))  # Move this line here
+                    self.write_to_file(device_name, device_class, device_id)
+
+                self.queue.put(('connect', device_name, device_class, device_status))
 
         # Check for disconnected devices
         for key in list(self.devices.keys()):
@@ -135,6 +204,20 @@ class USBEnumerator:
             if self.p is not None and self.p.is_alive():
                 self.p.terminate()
             self.keystroke_monitoring_started = False
+
+    def write_to_file(self, device_name, device_class, device_id):
+        # Read the current contents of the file
+        with open('registered.txt', 'r') as f:
+            devices = f.readlines()
+
+        # Prepare the new device entry
+        new_device = f"{device_name},{device_class},{device_id}\n"
+
+        # Check if the new device is already in the file
+        if new_device not in devices:
+            # If not, append it to the file
+            with open('registered.txt', 'a') as f:
+                f.write(new_device)
 
 class KeystrokeMonitoring:
     def __init__(self):
