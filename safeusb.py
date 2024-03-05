@@ -161,63 +161,73 @@ class USBEnumerator:
 
     def usb_enum(self, *args):        
         new_devices = self.usb_monitor.get_available_devices()
+        registered_devices = self.load_registered_devices()
 
-        # Load the registered devices from the file
+        self.check_new_devices(new_devices, registered_devices)
+        self.check_disconnected_devices(new_devices)
+
+        self.devices = new_devices
+        self.check_unregistered_devices()
+
+    def load_registered_devices(self):
         with open('registered.txt', 'r') as f:
             registered_devices = [line.strip().split(',') for line in f]
+        return registered_devices
 
-        # Check for new devices
+    def check_new_devices(self, new_devices, registered_devices):
         for key, device in new_devices.items():
             if key not in self.devices:
-                # Get the device details
                 device_name = f"{device['ID_MODEL_FROM_DATABASE']}"
                 device_class = f"{device['ID_USB_CLASS_FROM_DATABASE']}"
                 device_id = f"{device['DEVNAME']}"
 
-                # Check if the device is registered
                 if any(rd[0] == device_name and rd[1] == device_class and rd[2] == device_id for rd in registered_devices):
                     device_status = 'Registered'
                 elif device_class == 'HIDClass':
                     device_status = 'Unregistered'
-                    if not self.keystroke_monitoring_started:
-                        keystroke_monitoring = KeystrokeMonitoring()
-                        self.p = multiprocessing.Process(target=keystroke_monitoring.start)
-                        self.p.start()
-                        self.keystroke_monitoring_started = True  
+                    self.start_keystroke_monitoring()
                 else:
                     device_status = 'Registered'
                     self.write_to_file(device_name, device_class, device_id)
 
                 self.queue.put(('connect', device_name, device_class, device_status))
 
-        # Check for disconnected devices
+    def start_keystroke_monitoring(self):
+        if not self.keystroke_monitoring_started:
+            keystroke_monitoring = KeystrokeMonitoring()
+            self.p = multiprocessing.Process(target=keystroke_monitoring.start)
+            self.p.start()
+            self.keystroke_monitoring_started = True  
+
+    def check_disconnected_devices(self, new_devices):
         for key in list(self.devices.keys()):
             if key not in new_devices:
                 self.queue.put(('disconnect', self.devices[key]['ID_MODEL_FROM_DATABASE']))
 
-        self.devices = new_devices
-
-        # Check if there are any Unregistered devices left
+    def check_unregistered_devices(self):
         unregistered_devices_left = any(device['ID_USB_CLASS_FROM_DATABASE'] == 'HIDClass' for device in self.devices.values())
         if not unregistered_devices_left and self.keystroke_monitoring_started:
-            # Terminate the keystroke monitoring process
-            if self.p is not None and self.p.is_alive():
-                self.p.terminate()
-            self.keystroke_monitoring_started = False
+            self.terminate_keystroke_monitoring()
+
+    def terminate_keystroke_monitoring(self):
+        if self.p is not None and self.p.is_alive():
+            self.p.terminate()
+        self.keystroke_monitoring_started = False
 
     def write_to_file(self, device_name, device_class, device_id):
-        # Read the current contents of the file
+        devices = self.read_current_contents()
+        new_device = f"{device_name},{device_class},{device_id}\n"
+        if new_device not in devices:
+            self.append_to_file(new_device)
+
+    def read_current_contents(self):
         with open('registered.txt', 'r') as f:
             devices = f.readlines()
+        return devices
 
-        # Prepare the new device entry
-        new_device = f"{device_name},{device_class},{device_id}\n"
-
-        # Check if the new device is already in the file
-        if new_device not in devices:
-            # If not, append it to the file
-            with open('registered.txt', 'a') as f:
-                f.write(new_device)
+    def append_to_file(self, new_device):
+        with open('registered.txt', 'a') as f:
+            f.write(new_device)
 
 class KeystrokeMonitoring:
     def __init__(self):
@@ -226,7 +236,7 @@ class KeystrokeMonitoring:
         self.speed = 0
         self.prev = -1
         self.i = 0
-        self.speedIintrusion = False
+        self.speedIntrusion = False
         self.history = [self.limit+1] * self.size
         self.keylogged = ""
         self.keyWords = ["POWERSHELL", "CMD", "USER", "OBJECT"]
@@ -234,45 +244,56 @@ class KeystrokeMonitoring:
         self.notification_sent = False
 
     def KeyboardEvent(self, event):
-        print("Keystroke : " + event.Key)
-        self.keylogged += event.Key
+        self.log_key(event.Key)
+        self.detect_keywords()
+        self.calculate_speed(event.Time)
+        self.detect_intrusion()
+        return True
 
+    def log_key(self, key):
+        print("Keystroke : " + key)
+        self.keylogged += key
+
+    def detect_keywords(self):
         for word in self.keyWords:
             if word in self.keylogged.upper():
                 print(f"[*] Key Words Detected: [{word}]")
                 self.contentIntrusion = True
                 self.keylogged = ""
 
+    def calculate_speed(self, time):
         if (self.prev == -1):
-            self.prev = event.Time
-            return True
+            self.prev = time
+            return
 
         if (self.i >= len(self.history)): self.i = 0
 
-        self.history[self.i] = event.Time - self.prev
-        print(event.Time, "-", self.prev, "=", self.history[self.i])
-        self.prev = event.Time
+        self.history[self.i] = time - self.prev
+        print(time, "-", self.prev, "=", self.history[self.i])
+        self.prev = time
         self.speed = sum(self.history) / float(len(self.history))
         self.i = self.i + 1
 
         print("\rAverage Typing Speed:", self.speed)
 
         if (self.speed < self.limit):
-            self.speedIintrusion = True
-            # do something (plan : mark device as malicious, disconnect device and add to blacklist)
+            self.speedIntrusion = True
         else:
-            self.speedIintrusion = False
+            self.speedIntrusion = False
 
-        if (self.speedIintrusion or self.contentIntrusion) and not self.notification_sent:
-            intrusionWarning = Notify()
-            intrusionWarning.title = "Intrusion Detected"
-            intrusionWarning.message = "HID keystroke injection by BadUSB detected"
-            intrusionWarning.icon = "warning.png"
-            intrusionWarning.send()
-            self.notification_sent = True  # Set the flag to True after sending a notification
-        elif not self.speedIintrusion and not self.contentIntrusion:
-            self.notification_sent = False  # Reset the flag when the conditions are no longer met
-        return True
+    def detect_intrusion(self):
+        if (self.speedIntrusion or self.contentIntrusion) and not self.notification_sent:
+            self.send_intrusion_warning()
+            self.notification_sent = True
+        elif not self.speedIntrusion and not self.contentIntrusion:
+            self.notification_sent = False
+
+    def send_intrusion_warning(self):
+        intrusionWarning = Notify()
+        intrusionWarning.title = "Intrusion Detected"
+        intrusionWarning.message = "HID keystroke injection by BadUSB detected"
+        intrusionWarning.icon = "warning.png"
+        intrusionWarning.send()
 
     def start(self):
         keymon = pyHook.HookManager()
