@@ -114,15 +114,15 @@ class App:
                 messagebox.showwarning("Warning", f"Device {device_name} not found.")
                 continue
 
+            device_id = None
             for device in matching_devices:
                 device_id = device['DEVNAME']
-                # Check if the device is already registered
+                # Check if the device is already registered by name, class, and ID
                 if any(rd[0] == device_name and rd[1] == device_class and rd[2] == device_id for rd in registered_devices):
                     messagebox.showwarning("Warning", f"Device {device_name} is already registered.")
                     continue
                 # Register the device
                 usb_enumerator.write_to_file(device_name, device_class, device_id)
-
                 # Update the device status in the table
                 self.deviceTable.set(item, 'Status', 'Registered')
                 self.deviceTable.item(item, tags=('Registered',))
