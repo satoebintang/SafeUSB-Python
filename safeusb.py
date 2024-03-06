@@ -20,79 +20,56 @@ class App:
         self.setup_tab_control()
         self.setup_device_table()
         self.setup_registered_device_table()
-        self.refresh_registered_device()
         self.setup_buttons()
         self.refresh_registered_device()
 
     def setup_window(self):
-        #setting title
         self.root.title("SafeUSB")
-        #setting window size
-        width=680
-        height= 290
-        screenwidth = self.root.winfo_screenwidth()
-        screenheight = self.root.winfo_screenheight()
+        width, height = 680, 290
+        screenwidth, screenheight = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
         alignstr = '%dx%d+%d+%d' % (width, height, (screenwidth - width) / 2, (screenheight - height) / 2)
         self.root.geometry(alignstr)
         self.root.resizable(width=False, height=False)
 
     def setup_tab_control(self):
-        # Create the tab control
         self.tabControl = ttk.Notebook(self.root)
-
-        # Create the tabs
-        self.tab1 = ttk.Frame(self.tabControl)
-        self.tab2 = ttk.Frame(self.tabControl)
-        self.tab3 = ttk.Frame(self.tabControl)
-
-        # Add the tabs to the tab control
+        self.tab1, self.tab2, self.tab3 = ttk.Frame(self.tabControl), ttk.Frame(self.tabControl), ttk.Frame(self.tabControl)
         self.tabControl.add(self.tab1, text='Active Devices')
         self.tabControl.add(self.tab2, text='Registered Device')
         self.tabControl.add(self.tab3, text='Configuration')
-
-        # Pack to make visible
         self.tabControl.pack(expand=1, fill="both")
 
+    def setup_table(self, tab, columns, scrollbar_x, scrollbar_y):
+        scrollbar = ttk.Scrollbar(tab)
+        scrollbar.place(x=scrollbar_x, y=scrollbar_y, height=207)
+        table = ttk.Treeview(tab, selectmode="extended", show="headings", yscrollcommand=scrollbar.set)
+        scrollbar.configure(command=table.yview)
+        table['columns'] = columns
+        for col in table['columns']:
+            table.heading(col, text=col)
+            table.column(col, width=tkFont.Font().measure(col))
+        table.place(x=10, y=10, width=647, height=207)
+        return table
+
     def setup_device_table(self):
-        self.scrollbar = ttk.Scrollbar(self.tab1)
-        self.scrollbar.place(x=657,y=10,height=207)
-        self.deviceTable=ttk.Treeview(self.tab1) 
-        self.deviceTable = ttk.Treeview(self.tab1, selectmode="extended", show="headings", yscrollcommand=self.scrollbar.set)
-        self.scrollbar.configure(command=self.deviceTable.yview)
-        self.deviceTable['columns'] = ('Device Name', 'Class', 'Status', 'Device ID')
-        for col in self.deviceTable['columns']:
-            self.deviceTable.heading(col, text=col)
-            self.deviceTable.column(col, width=tkFont.Font().measure(col))
+        self.deviceTable = self.setup_table(self.tab1, ('Device Name', 'Class', 'Status', 'Device ID'), 657, 10)
         self.deviceTable.tag_configure('Registered', background='green')
         self.deviceTable.tag_configure('Unregistered', background='yellow')
         self.deviceTable.tag_configure('Malicious', background='red')
-        self.deviceTable.place(x=10,y=10,width=647,height=207)
-        
+
     def setup_registered_device_table(self):
-        self.scrollbar2 = ttk.Scrollbar(self.tab2)
-        self.scrollbar2.place(x=657,y=10,height=207)
-        self.registeredDeviceTable=ttk.Treeview(self.tab2) 
-        self.registeredDeviceTable = ttk.Treeview(self.tab2, selectmode="extended", show="headings", yscrollcommand=self.scrollbar2.set)
-        self.scrollbar2.configure(command=self.registeredDeviceTable.yview)
-        self.registeredDeviceTable['columns'] = ('Device Name', 'Device Class', 'Device ID')
-        for col in self.registeredDeviceTable['columns']:
-            self.registeredDeviceTable.heading(col, text=col)
-            self.registeredDeviceTable.column(col, width=tkFont.Font().measure(col))
-        self.registeredDeviceTable.place(x=10,y=10,width=647,height=207)
-                
+        self.registeredDeviceTable = self.setup_table(self.tab2, ('Device Name', 'Device Class', 'Device ID'), 657, 10)
+
     def setup_buttons(self):
-        self.authButton = ttk.Button(self.tab1)
-        self.authButton.configure(text="Register Selected")
+        self.authButton = ttk.Button(self.tab1, text="Register Selected", command=self.register_selected_devices)
         self.authButton.place(x=10, y=230)
-        self.authButton.configure(command=self.register_selected_devices)  # Add this line
-        
+
     def register_selected_devices(self):
         selected_items = self.deviceTable.selection()
         if not selected_items:
             messagebox.showwarning("Warning", "No device selected.")
             return
 
-        # Load the registered devices from the file
         with open('registered.txt', 'r') as f:
             registered_devices = [line.strip().split(',') for line in f]
 
@@ -102,37 +79,30 @@ class App:
                 messagebox.showwarning("Warning", f"Device {device_name} is already registered.")
                 continue
 
-            # Fetch the device ID from the USBEnumerator class
             matching_devices = [device for device in usb_enumerator.devices.values() if device['DEVNAME'] == device_id]
             if not matching_devices:
                 messagebox.showwarning("Warning", f"Device {device_name} not found.")
                 continue
 
             for device in matching_devices:
-                # Check if the device is already registered by name, class, and ID
                 if any(rd[0] == device_name and rd[1] == device_class and rd[2] == device_id for rd in registered_devices):
                     messagebox.showwarning("Warning", f"Device {device_name} is already registered.")
                     continue
-                # Register the device
                 usb_enumerator.write_to_file(device_name, device_class, device_id)
-                # Update the device status in the table
                 self.deviceTable.set(item, 'Status', 'Registered')
                 self.deviceTable.item(item, tags=('Registered',))
                 self.refresh_registered_device()
-                
+
     def refresh_registered_device(self):    
-        # Clear the table
         for i in self.registeredDeviceTable.get_children():
             self.registeredDeviceTable.delete(i)
-        # Check if the file exists, if not, create it
         if not os.path.isfile('registered.txt'):
             open('registered.txt', 'w').close()
-        # Read data from "registered.txt" and insert into the table
         with open('registered.txt', 'r') as f:
             for line in f:
                 device_name, device_class, device_id = line.strip().split(',')
                 self.registeredDeviceTable.insert('', 'end', values=(device_name, device_class, device_id))   
-                             
+
     def hide_window(self):
         runNotify = Notify()
         runNotify.title = "SafeUSB is active"
