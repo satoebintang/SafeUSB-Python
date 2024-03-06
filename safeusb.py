@@ -57,7 +57,7 @@ class App:
         self.deviceTable=ttk.Treeview(self.tab1) 
         self.deviceTable = ttk.Treeview(self.tab1, selectmode="extended", show="headings", yscrollcommand=self.scrollbar.set)
         self.scrollbar.configure(command=self.deviceTable.yview)
-        self.deviceTable['columns'] = ('Device Name', 'Class', 'Status')
+        self.deviceTable['columns'] = ('Device Name', 'Class', 'Status', 'Device ID')
         for col in self.deviceTable['columns']:
             self.deviceTable.heading(col, text=col)
             self.deviceTable.column(col, width=tkFont.Font().measure(col))
@@ -90,42 +90,6 @@ class App:
         self.authButton = ttk.Button(self.tab1)
         self.authButton.configure(text="Register Selected")
         self.authButton.place(x=10, y=230)
-        self.authButton.configure(command=self.register_selected_devices)  # Add this line
-        
-    def register_selected_devices(self):
-        selected_items = self.deviceTable.selection()
-        if not selected_items:
-            messagebox.showwarning("Warning", "No device selected.")
-            return
-
-        # Load the registered devices from the file
-        with open('registered.txt', 'r') as f:
-            registered_devices = [line.strip().split(',') for line in f]
-
-        for item in selected_items:
-            device_name, device_class, device_status = self.deviceTable.item(item, "values")
-            if device_status == 'Registered':
-                messagebox.showwarning("Warning", f"Device {device_name} is already registered.")
-                continue
-
-            # Fetch the device ID from the USBEnumerator class
-            matching_devices = [device for device in usb_enumerator.devices.values() if device['ID_MODEL_FROM_DATABASE'] == device_name and device['ID_USB_CLASS_FROM_DATABASE'] == device_class]
-            if not matching_devices:
-                messagebox.showwarning("Warning", f"Device {device_name} not found.")
-                continue
-
-            device_id = None
-            for device in matching_devices:
-                device_id = device['DEVNAME']
-                # Check if the device is already registered by name, class, and ID
-                if any(rd[0] == device_name and rd[1] == device_class and rd[2] == device_id for rd in registered_devices):
-                    messagebox.showwarning("Warning", f"Device {device_name} is already registered.")
-                    continue
-                # Register the device
-                usb_enumerator.write_to_file(device_name, device_class, device_id)
-                # Update the device status in the table
-                self.deviceTable.set(item, 'Status', 'Registered')
-                self.deviceTable.item(item, tags=('Registered',))
 
     def hide_window(self):
         runNotify = Notify()
@@ -190,7 +154,7 @@ class USBEnumerator:
                     device_status = 'Registered'
                     self.write_to_file(device_name, device_class, device_id)
 
-                self.queue.put(('connect', device_name, device_class, device_status))
+                self.queue.put(('connect', device_name, device_class, device_status, device_id))
 
     def start_keystroke_monitoring(self):
         if not self.keystroke_monitoring_started:
@@ -312,11 +276,11 @@ if __name__ == "__main__":
         while not q.empty():
             action, *data = q.get()
             if action == 'connect':
-                device_name, device_class, device_status = data
+                device_name, device_class, device_status, device_id = data
                 if device_status == 'Unregistered':
-                    app.deviceTable.insert('', 0, values=(device_name, device_class, device_status), tags=(device_status,))
+                    app.deviceTable.insert('', 0, values=(device_name, device_class, device_status, device_id), tags=(device_status,))
                 else:
-                    app.deviceTable.insert('', 'end' if device_status == 'Registered' else 0, values=(device_name, device_class, device_status), tags=(device_status,))
+                    app.deviceTable.insert('', 'end' if device_status == 'Registered' else 0, values=(device_name, device_class, device_status, device_id), tags=(device_status,))
             elif action == 'disconnect':
                 device_name = data[0]
                 for item in app.deviceTable.get_children():
