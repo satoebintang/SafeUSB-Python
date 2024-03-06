@@ -126,8 +126,9 @@ class App:
         root.destroy()
 
 class USBEnumerator:
-    def __init__(self, queue):
+    def __init__(self, queue, callback=None):
         self.queue = queue
+        self.callback = callback
         self.usb_monitor = USBMonitor()
         self.keystroke_monitoring_started = False
         self.p = None
@@ -197,6 +198,8 @@ class USBEnumerator:
         new_device = f"{device_name},{device_class},{device_id}\n"
         if new_device not in devices:
             self.append_to_file(new_device)
+            if self.callback:
+                self.callback()
 
     def read_current_contents(self):
         if not os.path.isfile('registered.txt'):
@@ -287,7 +290,7 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = App(root)
     q = multiprocessing.Queue()
-    usb_enumerator = USBEnumerator(q)
+    usb_enumerator = USBEnumerator(q, app.refresh_registered_device)
     root.protocol('WM_DELETE_WINDOW', app.hide_window)
 
     def update_gui():
