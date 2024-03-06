@@ -143,6 +143,20 @@ class USBEnumerator:
         new_devices = self.usb_monitor.get_available_devices()
         registered_devices = self.load_registered_devices()
 
+        for key, device in new_devices.items():
+            device_name = f"{device['ID_MODEL_FROM_DATABASE']}"
+            device_class = f"{device['ID_USB_CLASS_FROM_DATABASE']}"
+            device_id = f"{device['DEVNAME']}"
+
+            if any(rd[0] == device_name and rd[1] == device_class and rd[2] == device_id for rd in registered_devices):
+                device_status = 'Registered'
+            elif device_class == 'HIDClass':
+                device_status = 'Unregistered'
+            else:
+                device_status = 'Registered'
+
+            device['Status'] = device_status  # Store the status in the device dictionary
+
         self.check_new_devices(new_devices, registered_devices)
         self.check_disconnected_devices(new_devices)
 
