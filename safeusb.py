@@ -89,9 +89,12 @@ class App:
                     messagebox.showwarning("Warning", f"Device {device_name} is already registered.")
                     continue
                 usb_enumerator.write_to_file(device_name, device_class, device_id)
+                device['Status'] = 'Registered'  # Update the 'Status' key in the device dictionary
                 self.deviceTable.set(item, 'Status', 'Registered')
                 self.deviceTable.item(item, tags=('Registered',))
                 self.refresh_registered_device()
+        # Check for unregistered devices after a device is registered
+        usb_enumerator.check_unregistered_devices()
 
     def refresh_registered_device(self):    
         for i in self.registeredDeviceTable.get_children():
@@ -169,6 +172,7 @@ class USBEnumerator:
                     device_status = 'Registered'
                     self.write_to_file(device_name, device_class, device_id)
 
+                device['Status'] = device_status  # Store the status in the device dictionary
                 self.queue.put(('connect', device_name, device_class, device_status, device_id))
 
     def start_keystroke_monitoring(self):
@@ -184,7 +188,7 @@ class USBEnumerator:
                 self.queue.put(('disconnect', self.devices[key]['ID_MODEL_FROM_DATABASE']))
 
     def check_unregistered_devices(self):
-        unregistered_devices_left = any(device['ID_USB_CLASS_FROM_DATABASE'] == 'HIDClass' for device in self.devices.values())
+        unregistered_devices_left = any(device['Status'] == 'Unregistered' for device in self.devices.values())
         if not unregistered_devices_left and self.keystroke_monitoring_started:
             self.terminate_keystroke_monitoring()
 
