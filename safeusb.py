@@ -20,7 +20,9 @@ class App:
         self.setup_tab_control()
         self.setup_device_table()
         self.setup_registered_device_table()
+        self.refresh_registered_device()
         self.setup_buttons()
+        self.refresh_registered_device()
 
     def setup_window(self):
         #setting title
@@ -77,6 +79,51 @@ class App:
             self.registeredDeviceTable.heading(col, text=col)
             self.registeredDeviceTable.column(col, width=tkFont.Font().measure(col))
         self.registeredDeviceTable.place(x=10,y=10,width=647,height=207)
+                
+    def setup_buttons(self):
+        self.authButton = ttk.Button(self.tab1)
+        self.authButton.configure(text="Register Selected")
+        self.authButton.place(x=10, y=230)
+        self.authButton.configure(command=self.register_selected_devices)  # Add this line
+        
+    def register_selected_devices(self):
+        selected_items = self.deviceTable.selection()
+        if not selected_items:
+            messagebox.showwarning("Warning", "No device selected.")
+            return
+
+        # Load the registered devices from the file
+        with open('registered.txt', 'r') as f:
+            registered_devices = [line.strip().split(',') for line in f]
+
+        for item in selected_items:
+            device_name, device_class, device_status, device_id = self.deviceTable.item(item, "values")
+            if device_status == 'Registered':
+                messagebox.showwarning("Warning", f"Device {device_name} is already registered.")
+                continue
+
+            # Fetch the device ID from the USBEnumerator class
+            matching_devices = [device for device in usb_enumerator.devices.values() if device['DEVNAME'] == device_id]
+            if not matching_devices:
+                messagebox.showwarning("Warning", f"Device {device_name} not found.")
+                continue
+
+            for device in matching_devices:
+                # Check if the device is already registered by name, class, and ID
+                if any(rd[0] == device_name and rd[1] == device_class and rd[2] == device_id for rd in registered_devices):
+                    messagebox.showwarning("Warning", f"Device {device_name} is already registered.")
+                    continue
+                # Register the device
+                usb_enumerator.write_to_file(device_name, device_class, device_id)
+                # Update the device status in the table
+                self.deviceTable.set(item, 'Status', 'Registered')
+                self.deviceTable.item(item, tags=('Registered',))
+                self.refresh_registered_device()
+                
+    def refresh_registered_device(self):    
+        # Clear the table
+        for i in self.registeredDeviceTable.get_children():
+            self.registeredDeviceTable.delete(i)
         # Check if the file exists, if not, create it
         if not os.path.isfile('registered.txt'):
             open('registered.txt', 'w').close()
@@ -84,13 +131,8 @@ class App:
         with open('registered.txt', 'r') as f:
             for line in f:
                 device_name, device_class, device_id = line.strip().split(',')
-                self.registeredDeviceTable.insert('', 'end', values=(device_name, device_class, device_id))
-                
-    def setup_buttons(self):
-        self.authButton = ttk.Button(self.tab1)
-        self.authButton.configure(text="Register Selected")
-        self.authButton.place(x=10, y=230)
-
+                self.registeredDeviceTable.insert('', 'end', values=(device_name, device_class, device_id))   
+                             
     def hide_window(self):
         runNotify = Notify()
         runNotify.title = "SafeUSB is active"
@@ -134,6 +176,8 @@ class USBEnumerator:
         self.check_unregistered_devices()
 
     def load_registered_devices(self):
+        if not os.path.isfile('registered.txt'):
+            open('registered.txt', 'w').close()
         with open('registered.txt', 'r') as f:
             registered_devices = [line.strip().split(',') for line in f]
         return registered_devices
@@ -185,11 +229,15 @@ class USBEnumerator:
             self.append_to_file(new_device)
 
     def read_current_contents(self):
+        if not os.path.isfile('registered.txt'):
+            open('registered.txt', 'w').close()
         with open('registered.txt', 'r') as f:
             devices = f.readlines()
         return devices
 
     def append_to_file(self, new_device):
+        if not os.path.isfile('registered.txt'):
+            open('registered.txt', 'w').close()
         with open('registered.txt', 'a') as f:
             f.write(new_device)
 
