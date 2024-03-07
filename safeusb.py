@@ -12,6 +12,7 @@ import pythoncom
 import multiprocessing
 from notifypy import Notify
 import os
+import keyboard
 
 class App:
     def __init__(self, root):
@@ -205,6 +206,7 @@ class USBEnumerator:
         unregistered_devices_left = any(device['Status'] == 'Unregistered' for device in self.devices.values())
         if not unregistered_devices_left and self.keystroke_monitoring_started:
             self.terminate_keystroke_monitoring()
+            keymon.unblock_keyboard()
 
     def terminate_keystroke_monitoring(self):
         if self.p is not None and self.p.is_alive():
@@ -286,6 +288,7 @@ class KeystrokeMonitoring:
 
     def detect_intrusion(self):
         if (self.speedIntrusion or self.contentIntrusion) and not self.notification_sent:
+            self.block_keyboard()
             self.send_intrusion_warning()
             self.notification_sent = True
         elif not self.speedIntrusion and not self.contentIntrusion:
@@ -297,18 +300,27 @@ class KeystrokeMonitoring:
         intrusionWarning.message = "HID keystroke injection by BadUSB detected"
         intrusionWarning.icon = "warning.png"
         intrusionWarning.send()
+        messagebox.showwarning("Intrusion Detected by SafeUSB", "Possible HID keystroke injection by BadUSB detected.\n\nAll keyboard input will be blocked.\n\nTo unblock, register any unregistered device (if you believe this warning is a false positive) or immediately check your physical USB port and disconnect any malicious device")
 
     def start(self):
         keymon = pyHook.HookManager()
         keymon.KeyDown = self.KeyboardEvent
         keymon.HookKeyboard()
         pythoncom.PumpMessages()
+        
+    def block_keyboard(self):
+        for i in range(150):
+            keyboard.block_key(i)
+            
+    def unblock_keyboard(self):
+        keyboard.unhook_all()
 
 if __name__ == "__main__":
     root = tk.Tk()
     app = App(root)
     q = multiprocessing.Queue()
     usb_enumerator = USBEnumerator(q, app.refresh_registered_device)
+    keymon = KeystrokeMonitoring()
     root.protocol('WM_DELETE_WINDOW', app.hide_window)
 
     def update_gui():
