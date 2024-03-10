@@ -13,6 +13,7 @@ import multiprocessing
 from notifypy import Notify
 import os
 import keyboard
+import json
 
 class App:
     def __init__(self, root):
@@ -34,10 +35,9 @@ class App:
 
     def setup_tab_control(self):
         self.tabControl = ttk.Notebook(self.root)
-        self.tab1, self.tab2, self.tab3 = ttk.Frame(self.tabControl), ttk.Frame(self.tabControl), ttk.Frame(self.tabControl)
+        self.tab1, self.tab2 = ttk.Frame(self.tabControl), ttk.Frame(self.tabControl)
         self.tabControl.add(self.tab1, text='Active Devices')
         self.tabControl.add(self.tab2, text='Registered Device')
-        self.tabControl.add(self.tab3, text='Configuration')
         self.tabControl.pack(expand=1, fill="both")
 
     def setup_table(self, tab, columns, scrollbar_x, scrollbar_y):
@@ -169,6 +169,8 @@ class USBEnumerator:
             open('registered.txt', 'w').close()
         with open('registered.txt', 'r') as f:
             registered_devices = [line.strip().split(',') for line in f]
+        if not registered_devices:
+            messagebox.showinfo("Enumerating Device", "SafeUSB is enumerating device for the first time.")
         return registered_devices
 
     def check_new_devices(self, new_devices, registered_devices):
@@ -244,9 +246,33 @@ class KeystrokeMonitoring:
         self.speedIntrusion = False
         self.history = [self.limit+1] * self.size
         self.keylogged = ""
-        self.keyWords = ["POWERSHELL", "CMD", "USER", "OBJECT"]
+        self.keyWords = self.read_keywords()
         self.contentIntrusion = False
         self.notification_sent = False
+    
+    def read_keywords(self):
+        filename = "wordlist.txt"
+        default_keywords = ["POWERSHELL", "CMD", "USER", "OBJECT"]
+
+        # Check if file exists
+        if not os.path.exists(filename):
+            with open(filename, 'w') as f:
+                json.dump(default_keywords, f)
+            return default_keywords
+
+        # Load keywords from file
+        with open(filename, 'r') as f:
+            try:
+                keywords = json.load(f)
+                # If file is empty, write the default keywords
+                if not keywords:
+                    raise ValueError("Keyword list is empty")
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+                with open(filename, 'w') as f:
+                    json.dump(default_keywords, f)
+                return default_keywords
+        return keywords
 
     def KeyboardEvent(self, event):
         self.log_key(event.Key)
