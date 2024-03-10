@@ -71,7 +71,7 @@ class App:
             messagebox.showwarning("Warning", "No device selected.")
             return
 
-        with open('registered.txt', 'r') as f:
+        with open('safeusb-data/registered.txt', 'r') as f:
             registered_devices = [line.strip().split(',') for line in f]
 
         for item in selected_items:
@@ -100,9 +100,9 @@ class App:
     def refresh_registered_device(self):    
         for i in self.registeredDeviceTable.get_children():
             self.registeredDeviceTable.delete(i)
-        if not os.path.isfile('registered.txt'):
-            open('registered.txt', 'w').close()
-        with open('registered.txt', 'r') as f:
+        if not os.path.isfile('safeusb-data/registered.txt'):
+            open('safeusb-data/registered.txt', 'w').close()
+        with open('safeusb-data/registered.txt', 'r') as f:
             for line in f:
                 device_name, device_class, device_id = line.strip().split(',')
                 self.registeredDeviceTable.insert('', 'end', values=(device_name, device_class, device_id))   
@@ -111,10 +111,10 @@ class App:
         runNotify = Notify()
         runNotify.title = "SafeUSB is active"
         runNotify.message = "SafeUSB is running in the background"
-        runNotify.icon = "information.png"
+        runNotify.icon = "safeusb-data/media/information.png"
         runNotify.send()
         root.withdraw()
-        image=Image.open("favicon.ico")
+        image=Image.open("safeusb-data/media/favicon.ico")
         menu=(item('Show', self.show_window), item('Quit', self.quit_window))
         icon=pystray.Icon("name", image, "SafeUSB", menu)
         icon.run()
@@ -165,9 +165,9 @@ class USBEnumerator:
         self.check_unregistered_devices()
 
     def load_registered_devices(self):
-        if not os.path.isfile('registered.txt'):
-            open('registered.txt', 'w').close()
-        with open('registered.txt', 'r') as f:
+        if not os.path.isfile('safeusb-data/registered.txt'):
+            open('safeusb-data/registered.txt', 'w').close()
+        with open('safeusb-data/registered.txt', 'r') as f:
             registered_devices = [line.strip().split(',') for line in f]
         if not registered_devices:
             messagebox.showinfo("Enumerating Device", "SafeUSB is enumerating device for the first time.")
@@ -224,16 +224,16 @@ class USBEnumerator:
                 self.callback()
 
     def read_current_contents(self):
-        if not os.path.isfile('registered.txt'):
-            open('registered.txt', 'w').close()
-        with open('registered.txt', 'r') as f:
+        if not os.path.isfile('safeusb-data/registered.txt'):
+            open('safeusb-data/registered.txt', 'w').close()
+        with open('safeusb-data/registered.txt', 'r') as f:
             devices = f.readlines()
         return devices
 
     def append_to_file(self, new_device):
-        if not os.path.isfile('registered.txt'):
-            open('registered.txt', 'w').close()
-        with open('registered.txt', 'a') as f:
+        if not os.path.isfile('safeusb-data/registered.txt'):
+            open('safeusb-data/registered.txt', 'w').close()
+        with open('safeusb-data/registered.txt', 'a') as f:
             f.write(new_device)
 
 class KeystrokeMonitoring:
@@ -251,7 +251,7 @@ class KeystrokeMonitoring:
         self.notification_sent = False
     
     def read_keywords(self):
-        filename = "wordlist.txt"
+        filename = "safeusb-data/wordlist.txt"
         default_keywords = ["POWERSHELL", "CMD", "USER", "OBJECT"]
 
         # Check if file exists
@@ -324,7 +324,7 @@ class KeystrokeMonitoring:
         intrusionWarning = Notify()
         intrusionWarning.title = "Intrusion Detected"
         intrusionWarning.message = "HID keystroke injection by BadUSB detected"
-        intrusionWarning.icon = "warning.png"
+        intrusionWarning.icon = "safeusb-data/media/warning.png"
         intrusionWarning.send()
         messagebox.showwarning("Intrusion Detected by SafeUSB", "Possible HID keystroke injection by BadUSB detected.\n\nAll keyboard input will be blocked.\n\nTo unblock, register any unregistered device (if you believe this warning is a false positive) or immediately check your physical USB port and disconnect any malicious device")
 
