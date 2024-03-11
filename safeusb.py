@@ -22,6 +22,7 @@ class App:
         self.setup_tab_control()
         self.setup_device_table()
         self.setup_registered_device_table()
+        self.setup_status_labels()
         self.setup_buttons()
         self.refresh_registered_device()
 
@@ -61,6 +62,25 @@ class App:
     def setup_registered_device_table(self):
         self.registeredDeviceTable = self.setup_table(self.tab2, ('Device Name', 'Device Class', 'Device ID'), 657, 10)
 
+    def setup_status_labels(self):
+        self.keystroke_status_label = tk.Label(self.root, text="Keystroke Monitoring: Inactive", fg="grey")
+        self.keystroke_status_label.place(x=320, y=253)
+
+        self.keyboard_block_status_label = tk.Label(self.root, text="Keyboard Block: Inactive", fg="grey")
+        self.keyboard_block_status_label.place(x=520, y=253)
+
+    def update_keystroke_status(self, status):
+        if status:
+            self.keystroke_status_label.config(text="Keystroke Monitoring: Active", fg="green")
+        else:
+            self.keystroke_status_label.config(text="Keystroke Monitoring: Inactive", fg="grey")
+
+    def update_keyboard_block_status(self, status):
+        if status:
+            self.keyboard_block_status_label.config(text="Keyboard Block: Active", fg="green")
+        else:
+            self.keyboard_block_status_label.config(text="Keyboard Block: Inactive", fg="grey")
+    
     def setup_buttons(self):
         self.authButton = ttk.Button(self.tab1, text="Register Selected", command=self.register_selected_devices)
         self.authButton.place(x=10, y=230)
