@@ -342,7 +342,7 @@ class KeystrokeMonitoring:
         keyboard.unhook_all()
 
 if __name__ == "__main__":
-    multiprocessing.freeze_support() #freeze_support must be enabled if compiling to exe
+    multiprocessing.freeze_support() #freeze_support must be enabled when compiling to exe with pyinstaller with multiprocessing
     root = tk.Tk()
     app = App(root)
     q = multiprocessing.Queue()
