@@ -6,7 +6,7 @@ from usbmonitor import USBMonitor
 from usbmonitor.attributes import ID_MODEL_FROM_DATABASE, ID_USB_CLASS_FROM_DATABASE, DEVNAME
 from pystray import MenuItem as item
 import pystray
-from PIL import Image
+from PIL import Image, ImageTk
 import pyWinhook as pyHook
 import pythoncom
 import multiprocessing
@@ -16,8 +16,11 @@ import keyboard
 import json
 
 class App:
-    def __init__(self, root):
+    def __init__(self, root, usb_enumerator, intrusion_handler, keymon):
         self.root = root
+        self.usb_enumerator = usb_enumerator
+        self.intrusion_handler = intrusion_handler
+        self.keymon = keymon
         self.setup_window()
         self.setup_tab_control()
         self.setup_device_table()
@@ -28,6 +31,9 @@ class App:
 
     def setup_window(self):
         self.root.title("SafeUSB")
+        icon = Image.open("safeusb-data/media/favicon.ico")
+        icon = ImageTk.PhotoImage(icon)
+        self.root.iconphoto(True, icon)
         width, height = 680, 290
         screenwidth, screenheight = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
         alignstr = '%dx%d+%d+%d' % (width, height, (screenwidth - width) / 2, (screenheight - height) / 2)
@@ -63,24 +69,12 @@ class App:
         self.registeredDeviceTable = self.setup_table(self.tab2, ('Device Name', 'Device Class', 'Device ID'), 657, 10)
 
     def setup_status_labels(self):
-        self.keystroke_status_label = tk.Label(self.root, text="Keystroke Monitoring: Inactive", fg="grey")
+        self.keystroke_status_label = tk.Label(self.root, text="Keystroke Monitoring: Stopped", fg="grey")
         self.keystroke_status_label.place(x=320, y=253)
 
-        self.keyboard_block_status_label = tk.Label(self.root, text="Keyboard Block: Inactive", fg="grey")
+        self.keyboard_block_status_label = tk.Label(self.root, text="Keyboard Block: Stopped", fg="grey")
         self.keyboard_block_status_label.place(x=520, y=253)
 
-    def update_keystroke_status(self, status):
-        if status:
-            self.keystroke_status_label.config(text="Keystroke Monitoring: Active", fg="green")
-        else:
-            self.keystroke_status_label.config(text="Keystroke Monitoring: Inactive", fg="grey")
-
-    def update_keyboard_block_status(self, status):
-        if status:
-            self.keyboard_block_status_label.config(text="Keyboard Block: Active", fg="green")
-        else:
-            self.keyboard_block_status_label.config(text="Keyboard Block: Inactive", fg="grey")
-    
     def setup_buttons(self):
         self.authButton = ttk.Button(self.tab1, text="Register Selected", command=self.register_selected_devices)
         self.authButton.place(x=10, y=230)
@@ -100,7 +94,7 @@ class App:
                 messagebox.showwarning("Warning", f"Device {device_name} is already registered.")
                 continue
 
-            matching_devices = [device for device in usb_enumerator.devices.values() if device['DEVNAME'] == device_id]
+            matching_devices = [device for device in self.usb_enumerator.devices.values() if device['DEVNAME'] == device_id]
             if not matching_devices:
                 messagebox.showwarning("Warning", f"Device {device_name} not found.")
                 continue
@@ -109,13 +103,13 @@ class App:
                 if any(rd[0] == device_name and rd[1] == device_class and rd[2] == device_id for rd in registered_devices):
                     messagebox.showwarning("Warning", f"Device {device_name} is already registered.")
                     continue
-                usb_enumerator.write_to_file(device_name, device_class, device_id)
+                self.usb_enumerator.write_to_file(device_name, device_class, device_id)
                 device['Status'] = 'Registered'  # Update the 'Status' key in the device dictionary
                 self.deviceTable.set(item, 'Status', 'Registered')
                 self.deviceTable.item(item, tags=('Registered',))
                 self.refresh_registered_device()
         # Check for unregistered devices after a device is registered
-        usb_enumerator.check_unregistered_devices()
+        self.usb_enumerator.check_unregistered_devices()
 
     def refresh_registered_device(self):    
         for i in self.registeredDeviceTable.get_children():
@@ -145,14 +139,41 @@ class App:
 
     def quit_window(self, icon, item):
         icon.stop()
-        if usb_enumerator.p is not None and usb_enumerator.p.is_alive():
-            usb_enumerator.p.terminate()
+        if self.usb_enumerator.p is not None and self.usb_enumerator.p.is_alive():
+            self.usb_enumerator.p.terminate()
         root.destroy()
-
+           
+    def update_gui(self):
+        while not q.empty():
+            action, *data = q.get()
+            if action == 'connect':
+                device_name, device_class, device_status, device_id = data
+                if device_status == 'Unregistered':
+                    self.deviceTable.insert('', 0, values=(device_name, device_class, device_status, device_id), tags=(device_status,))
+                else:
+                    self.deviceTable.insert('', 'end' if device_status == 'Registered' else 0, values=(device_name, device_class, device_status, device_id), tags=(device_status,))
+            elif action == 'disconnect':
+                device_name = data[0]
+                for item in self.deviceTable.get_children():
+                    if self.deviceTable.item(item, "values")[0] == device_name:
+                        self.deviceTable.delete(item)
+                        break
+            elif action == 'keystroke_monitoring_started':
+                    self.keystroke_status_label.config(text="Keystroke Monitoring: Active", fg="red")
+            elif action == 'keystroke_monitoring_stopped':
+                    self.keystroke_status_label.config(text="Keystroke Monitoring: Stopped", fg="grey")
+            elif action == 'keyboard_blocked':
+                    self.keyboard_block_status_label.config(text="Keyboard Block: Active", fg="red")
+            elif action == 'keyboard_unblocked':
+                    self.keyboard_block_status_label.config(text="Keyboard Block: Stopped", fg="grey")
+        self.root.after(100, self.update_gui)  # Schedule the next call to this function
+     
 class USBEnumerator:
-    def __init__(self, queue, callback=None):
+    def __init__(self, queue, keymon, intrusion_handler, callback=None):
         self.queue = queue
         self.callback = callback
+        self.keymon = keymon
+        self.intrusion_handler = intrusion_handler
         self.usb_monitor = USBMonitor()
         self.keystroke_monitoring_started = False
         self.p = None
@@ -173,14 +194,15 @@ class USBEnumerator:
                 device_status = 'Registered'
             elif device_class == 'HIDClass':
                 device_status = 'Unregistered'
+                self.start_keystroke_monitoring()
             else:
                 device_status = 'Registered'
+                self.write_to_file(device_name, device_class, device_id)
 
             device['Status'] = device_status  # Store the status in the device dictionary
 
         self.check_new_devices(new_devices, registered_devices)
         self.check_disconnected_devices(new_devices)
-
         self.devices = new_devices
         self.check_unregistered_devices()
 
@@ -214,10 +236,10 @@ class USBEnumerator:
 
     def start_keystroke_monitoring(self):
         if not self.keystroke_monitoring_started:
-            keystroke_monitoring = KeystrokeMonitoring()
-            self.p = multiprocessing.Process(target=keystroke_monitoring.start)
+            self.p = multiprocessing.Process(target=self.keymon.start)
             self.p.start()
             self.keystroke_monitoring_started = True  
+            self.queue.put(('keystroke_monitoring_started',))  
 
     def check_disconnected_devices(self, new_devices):
         for key in list(self.devices.keys()):
@@ -228,12 +250,13 @@ class USBEnumerator:
         unregistered_devices_left = any(device['Status'] == 'Unregistered' for device in self.devices.values())
         if not unregistered_devices_left and self.keystroke_monitoring_started:
             self.terminate_keystroke_monitoring()
-            keymon.unblock_keyboard()
+            self.intrusion_handler.unblock_keyboard()
 
     def terminate_keystroke_monitoring(self):
         if self.p is not None and self.p.is_alive():
             self.p.terminate()
         self.keystroke_monitoring_started = False
+        self.queue.put(('keystroke_monitoring_stopped',))  
 
     def write_to_file(self, device_name, device_class, device_id):
         devices = self.read_current_contents()
@@ -256,8 +279,31 @@ class USBEnumerator:
         with open('safeusb-data/registered.txt', 'a') as f:
             f.write(new_device)
 
+class IntrusionHandler:
+    def __init__(self, queue):
+        self.queue = queue
+        self.notification_sent = False
+
+    def send_intrusion_warning(self):
+        intrusionWarning = Notify()
+        intrusionWarning.title = "Intrusion Detected"
+        intrusionWarning.message = "HID keystroke injection by BadUSB detected"
+        intrusionWarning.icon = "safeusb-data/media/warning.png"
+        intrusionWarning.send()
+        messagebox.showwarning("Intrusion Detected by SafeUSB", "Possible HID keystroke injection by BadUSB detected.\n\nAll keyboard input will be blocked.\n\nTo unblock, register any unregistered device (if you believe this warning is a false positive) or immediately check your physical USB port and disconnect any malicious device")
+
+    def block_keyboard(self):
+        for i in range(150):
+            keyboard.block_key(i) 
+        self.queue.put(('keyboard_blocked',)) 
+    
+    def unblock_keyboard(self):
+        keyboard.unhook_all()
+        self.queue.put(('keyboard_unblocked',)) 
+
 class KeystrokeMonitoring:
-    def __init__(self):
+    def __init__(self, intrusion_handler):
+        self.intrusion_handler = intrusion_handler # Create an instance of IntrusionHandler
         self.limit = 30
         self.size = 25
         self.speed = 0
@@ -268,7 +314,6 @@ class KeystrokeMonitoring:
         self.keylogged = ""
         self.keyWords = self.read_keywords()
         self.contentIntrusion = False
-        self.notification_sent = False
     
     def read_keywords(self):
         filename = "safeusb-data/wordlist.txt"
@@ -333,59 +378,28 @@ class KeystrokeMonitoring:
             self.speedIntrusion = False
 
     def detect_intrusion(self):
-        if (self.speedIntrusion or self.contentIntrusion) and not self.notification_sent:
-            self.block_keyboard()
-            self.send_intrusion_warning()
-            self.notification_sent = True
+        if (self.speedIntrusion or self.contentIntrusion) and not self.intrusion_handler.notification_sent:
+            self.intrusion_handler.block_keyboard()
+            self.intrusion_handler.send_intrusion_warning()
+            self.intrusion_handler.notification_sent = True
         elif not self.speedIntrusion and not self.contentIntrusion:
-            self.notification_sent = False
-
-    def send_intrusion_warning(self):
-        intrusionWarning = Notify()
-        intrusionWarning.title = "Intrusion Detected"
-        intrusionWarning.message = "HID keystroke injection by BadUSB detected"
-        intrusionWarning.icon = "safeusb-data/media/warning.png"
-        intrusionWarning.send()
-        messagebox.showwarning("Intrusion Detected by SafeUSB", "Possible HID keystroke injection by BadUSB detected.\n\nAll keyboard input will be blocked.\n\nTo unblock, register any unregistered device (if you believe this warning is a false positive) or immediately check your physical USB port and disconnect any malicious device")
+            self.intrusion_handler.notification_sent = False
 
     def start(self):
-        keymon = pyHook.HookManager()
-        keymon.KeyDown = self.KeyboardEvent
-        keymon.HookKeyboard()
+        keyhook = pyHook.HookManager()
+        keyhook.KeyDown = self.KeyboardEvent
+        keyhook.HookKeyboard()
         pythoncom.PumpMessages()
-        
-    def block_keyboard(self):
-        for i in range(150):
-            keyboard.block_key(i)
-            
-    def unblock_keyboard(self):
-        keyboard.unhook_all()
 
 if __name__ == "__main__":
     multiprocessing.freeze_support() #freeze_support must be enabled when compiling to exe with pyinstaller with multiprocessing
     root = tk.Tk()
-    app = App(root)
     q = multiprocessing.Queue()
-    usb_enumerator = USBEnumerator(q, app.refresh_registered_device)
-    keymon = KeystrokeMonitoring()
+    handler = IntrusionHandler(q)
+    keymon = KeystrokeMonitoring(handler)
+    usb_enumerator = USBEnumerator(q, keymon, handler)
+    app = App(root, usb_enumerator, handler, keymon)
     root.protocol('WM_DELETE_WINDOW', app.hide_window)
 
-    def update_gui():
-        while not q.empty():
-            action, *data = q.get()
-            if action == 'connect':
-                device_name, device_class, device_status, device_id = data
-                if device_status == 'Unregistered':
-                    app.deviceTable.insert('', 0, values=(device_name, device_class, device_status, device_id), tags=(device_status,))
-                else:
-                    app.deviceTable.insert('', 'end' if device_status == 'Registered' else 0, values=(device_name, device_class, device_status, device_id), tags=(device_status,))
-            elif action == 'disconnect':
-                device_name = data[0]
-                for item in app.deviceTable.get_children():
-                    if app.deviceTable.item(item, "values")[0] == device_name:
-                        app.deviceTable.delete(item)
-                        break
-        root.after(1000, update_gui)  # Schedule the next call to this function
-
-    update_gui()  # Start the periodic call to the function
+    app.update_gui()  # Start the periodic call to the function
     root.mainloop()
