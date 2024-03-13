@@ -72,7 +72,7 @@ class App:
         self.keystroke_status_label = tk.Label(self.root, text="Keystroke Monitoring: Stopped", fg="grey")
         self.keystroke_status_label.place(x=320, y=253)
 
-        self.keyboard_block_status_label = tk.Label(self.root, text="Keyboard Block: Stopped", fg="grey")
+        self.keyboard_block_status_label = tk.Label(self.root, text="Keyboard Unblocked", fg="green")
         self.keyboard_block_status_label.place(x=520, y=253)
 
     def setup_buttons(self):
@@ -161,11 +161,11 @@ class App:
             elif action == 'keystroke_monitoring_started':
                     self.keystroke_status_label.config(text="Keystroke Monitoring: Active", fg="red")
             elif action == 'keystroke_monitoring_stopped':
-                    self.keystroke_status_label.config(text="Keystroke Monitoring: Stopped", fg="grey")
+                    self.keystroke_status_label.config(text="Keystroke Monitoring: Stopped", fg="green")
             elif action == 'keyboard_blocked':
-                    self.keyboard_block_status_label.config(text="Keyboard Block: Active", fg="red")
+                    self.keyboard_block_status_label.config(text="Keyboard Blocked", fg="red")
             elif action == 'keyboard_unblocked':
-                    self.keyboard_block_status_label.config(text="Keyboard Block: Stopped", fg="grey")
+                    self.keyboard_block_status_label.config(text="Keyboard Unblocked", fg="green")
         self.root.after(100, self.update_gui)  # Schedule the next call to this function
      
 class USBEnumerator:
