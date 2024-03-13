@@ -63,7 +63,6 @@ class App:
         self.deviceTable = self.setup_table(self.tab1, ('Device Name', 'Class', 'Status', 'Device ID'), 657, 10)
         self.deviceTable.tag_configure('Registered', background='green')
         self.deviceTable.tag_configure('Unregistered', background='yellow')
-        self.deviceTable.tag_configure('Malicious', background='red')
 
     def setup_registered_device_table(self):
         self.registeredDeviceTable = self.setup_table(self.tab2, ('Device Name', 'Device Class', 'Device ID'), 657, 10)
@@ -400,6 +399,7 @@ if __name__ == "__main__":
     usb_enumerator = USBEnumerator(q, keymon, handler)
     app = App(root, usb_enumerator, handler, keymon)
     root.protocol('WM_DELETE_WINDOW', app.hide_window)
-
+    
     app.update_gui()  # Start the periodic call to the function
+    app.hide_window()  # Add this line to hide the window on startup
     root.mainloop()
