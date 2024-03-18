@@ -340,7 +340,7 @@ class KeystrokeMonitoring:
     
     def read_keywords(self):
         filename = "safeusb-data/keywords.txt"
-        default_keywords = ["POWERSHELL", "CMD", "USER", "OBJECT"]
+        default_keywords = ["POWERSHELL", "CMD.EXE", "USER", "HOSTNAME", "TASK", "NEW-OBJECT"]
 
         # Check if file exists
         if not os.path.exists(filename):
