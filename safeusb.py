@@ -339,7 +339,7 @@ class KeystrokeMonitoring:
         self.contentIntrusion = False
     
     def read_keywords(self):
-        filename = "safeusb-data/wordlist.txt"
+        filename = "safeusb-data/keywords.txt"
         default_keywords = ["POWERSHELL", "CMD", "USER", "OBJECT"]
 
         # Check if file exists
