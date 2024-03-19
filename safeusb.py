@@ -31,7 +31,7 @@ class App:
 
     def setup_window(self):
         self.root.title("SafeUSB")
-        icon = Image.open("safeusb-data/media/favicon.ico")
+        icon = Image.open("favicon.ico")
         icon = ImageTk.PhotoImage(icon)
         self.root.iconphoto(True, icon)
         width, height = 680, 290
@@ -86,7 +86,7 @@ class App:
             messagebox.showwarning("Warning", "No device selected.")
             return
 
-        with open('safeusb-data/safe.txt', 'r') as f:
+        with open('safe.txt', 'r') as f:
             registered_devices = [line.strip().split(',') for line in f]
 
         for item in selected_items:
@@ -127,9 +127,9 @@ class App:
     def refresh_registered_device(self):    
         for i in self.registeredDeviceTable.get_children():
             self.registeredDeviceTable.delete(i)
-        if not os.path.isfile('safeusb-data/safe.txt'):
-            open('safeusb-data/safe.txt', 'w').close()
-        with open('safeusb-data/safe.txt', 'r') as f:
+        if not os.path.isfile('safe.txt'):
+            open('safe.txt', 'w').close()
+        with open('safe.txt', 'r') as f:
             for line in f:
                 device_name, device_class, device_id = line.strip().split(',')
                 self.registeredDeviceTable.insert('', 'end', values=(device_name, device_class, device_id))   
@@ -138,10 +138,10 @@ class App:
         runNotify = Notify()
         runNotify.title = "SafeUSB is active"
         runNotify.message = "SafeUSB is running in the background"
-        runNotify.icon = "safeusb-data/media/information.png"
+        runNotify.icon = "information.png"
         runNotify.send()
         root.withdraw()
-        image=Image.open("safeusb-data/media/favicon.ico")
+        image=Image.open("favicon.ico")
         menu=(item('Show', self.show_window), item('Quit', self.quit_window))
         icon=pystray.Icon("name", image, "SafeUSB", menu)
         icon.run()
@@ -220,9 +220,9 @@ class USBEnumerator:
         self.check_unregistered_devices()
 
     def load_registered_devices(self):
-        if not os.path.isfile('safeusb-data/safe.txt'):
-            open('safeusb-data/safe.txt', 'w').close()
-        with open('safeusb-data/safe.txt', 'r') as f:
+        if not os.path.isfile('safe.txt'):
+            open('safe.txt', 'w').close()
+        with open('safe.txt', 'r') as f:
             registered_devices = [line.strip().split(',') for line in f]
         if not registered_devices:
             messagebox.showinfo("Enumerating Device", "SafeUSB is enumerating device for the first time.")
@@ -284,22 +284,22 @@ class USBEnumerator:
         device = f"{device_name},{device_class},{device_id}\n"
         if device in devices:
             devices.remove(device)
-            with open('safeusb-data/safe.txt', 'w') as f:
+            with open('safe.txt', 'w') as f:
                 f.writelines(devices)
             if self.callback:
                 self.callback()
 
     def read_current_contents(self):
-        if not os.path.isfile('safeusb-data/safe.txt'):
-            open('safeusb-data/safe.txt', 'w').close()
-        with open('safeusb-data/safe.txt', 'r') as f:
+        if not os.path.isfile('safe.txt'):
+            open('safe.txt', 'w').close()
+        with open('safe.txt', 'r') as f:
             devices = f.readlines()
         return devices
 
     def append_to_file(self, new_device):
-        if not os.path.isfile('safeusb-data/safe.txt'):
-            open('safeusb-data/safe.txt', 'w').close()
-        with open('safeusb-data/safe.txt', 'a') as f:
+        if not os.path.isfile('safe.txt'):
+            open('safe.txt', 'w').close()
+        with open('safe.txt', 'a') as f:
             f.write(new_device)
 
 class IntrusionHandler:
@@ -311,7 +311,7 @@ class IntrusionHandler:
         intrusionWarning = Notify()
         intrusionWarning.title = "Intrusion Detected"
         intrusionWarning.message = "HID keystroke injection by BadUSB detected"
-        intrusionWarning.icon = "safeusb-data/media/warning.png"
+        intrusionWarning.icon = "warning.png"
         intrusionWarning.send()
         messagebox.showwarning("Intrusion Detected by SafeUSB", "Possible HID keystroke injection by BadUSB detected.\n\nAll keyboard input will be blocked.\n\nTo unblock, register any unregistered device (if you believe this warning is a false positive) or immediately check your physical USB port and disconnect any malicious device")
 
@@ -339,7 +339,7 @@ class KeystrokeMonitoring:
         self.contentIntrusion = False
     
     def read_keywords(self):
-        filename = "safeusb-data/keywords.txt"
+        filename = "keywords.txt"
         default_keywords = ["POWERSHELL", "CMD.EXE", "USER", "HOSTNAME", "TASK", "NEW-OBJECT"]
 
         # Check if file exists
