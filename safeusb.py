@@ -152,7 +152,7 @@ class App:
         runNotify.send()
         root.withdraw()
         image=Image.open(APP_ICON)
-        menu=(item('Show', self.show_window), item('Quit', self.quit_window))
+        menu=(item('Show', self.show_window), item('Quit', self.quit_program))
         icon=pystray.Icon("name", image, "SafeUSB", menu)
         icon.run()
 
@@ -160,17 +160,17 @@ class App:
         icon.stop()
         root.after(0,lambda: root.deiconify())
 
-    def quit_window(self, icon, item):
+    def quit_program(self, icon, item):
         icon.stop()
         if self.usb_enumerator.p is not None and self.usb_enumerator.p.is_alive():
             self.usb_enumerator.p.terminate()
         root.destroy()
         
     def restart_program(self):
-        python = sys.executable
         if self.usb_enumerator.p is not None and self.usb_enumerator.p.is_alive():
             self.usb_enumerator.p.terminate()
         root.destroy()
+        python = sys.executable
         subprocess.call([python] + sys.argv)
            
     def update_gui(self):
