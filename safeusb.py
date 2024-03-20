@@ -12,6 +12,8 @@ import pythoncom
 import multiprocessing
 from notifypy import Notify
 import os
+import subprocess
+import sys
 import keyboard
 import json
 
@@ -128,7 +130,9 @@ class App:
             device_name, device_class, device_id = self.registeredDeviceTable.item(item, "values")
             self.usb_enumerator.remove_from_file(device_name, device_class, device_id)
             self.registeredDeviceTable.delete(item)
-        self.usb_enumerator.check_unregistered_devices()
+        
+        messagebox.showwarning("Info", "Device(s) unregistered, SafeUSB will restart")
+        self.restart_program()
 
     def refresh_registered_device(self):    
         for i in self.registeredDeviceTable.get_children():
@@ -161,6 +165,13 @@ class App:
         if self.usb_enumerator.p is not None and self.usb_enumerator.p.is_alive():
             self.usb_enumerator.p.terminate()
         root.destroy()
+        
+    def restart_program(self):
+        python = sys.executable
+        if self.usb_enumerator.p is not None and self.usb_enumerator.p.is_alive():
+            self.usb_enumerator.p.terminate()
+        root.destroy()
+        subprocess.call([python] + sys.argv)
            
     def update_gui(self):
         while not q.empty():
