@@ -1,3 +1,4 @@
+from cgitb import text
 import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.font as tkFont
@@ -16,6 +17,8 @@ import subprocess
 import sys
 import keyboard
 import json
+import winreg
+import configparser
 
 APP_ICON = "favicon.ico"
 WARNING_ICON = "warning.png"
@@ -24,17 +27,22 @@ SAFEDEVICES = "safe.txt"
 KEYWORDS = "keywords.txt"
 
 class App:
-    def __init__(self, root, usb_enumerator, intrusion_handler, keymon):
+    def __init__(self, root, usb_enumerator, intrusion_handler, keymon, config_handler, registry_manager):
         self.root = root
         self.usb_enumerator = usb_enumerator
         self.intrusion_handler = intrusion_handler
         self.keymon = keymon
+        self.config_handler = config_handler
+        self.registry_manager = registry_manager
+        self.var = tk.IntVar()
         self.setup_window()
         self.setup_tab_control()
         self.setup_device_table()
         self.setup_registered_device_table()
         self.setup_status_labels()
         self.setup_buttons()
+        self.setup_autostartcheckbox()
+        self.setup_keymonconfig()
         self.refresh_registered_device()
 
     def setup_window(self):
@@ -50,9 +58,10 @@ class App:
 
     def setup_tab_control(self):
         self.tabControl = ttk.Notebook(self.root)
-        self.tab1, self.tab2 = ttk.Frame(self.tabControl), ttk.Frame(self.tabControl)
+        self.tab1, self.tab2, self.tab3 = ttk.Frame(self.tabControl), ttk.Frame(self.tabControl), ttk.Frame(self.tabControl)
         self.tabControl.add(self.tab1, text='Active Devices')
         self.tabControl.add(self.tab2, text='Safe Devices')
+        self.tabControl.add(self.tab3, text='Configuration')
         self.tabControl.pack(expand=1, fill="both")
 
     def setup_table(self, tab, columns, scrollbar_x, scrollbar_y):
@@ -87,6 +96,53 @@ class App:
         self.authButton.place(x=10, y=230)
         self.unauthButton = ttk.Button(self.tab2, text="Unregister Device", command=self.unregister_selected_devices)
         self.unauthButton.place(x=10, y=230)
+        
+    def setup_autostartcheckbox(self):
+        try:
+            self.var.set(self.config_handler.load_from_config('Autostart', 'run_at_startup'))
+        except (configparser.NoSectionError, configparser.NoOptionError):
+            self.var.set(self.registry_manager.check_autostart_registry("SafeUSB"))
+
+        self.chk = ttk.Checkbutton(self.tab3, text="Run at startup", variable=self.var, command=self.toggle_autostart)
+        self.chk.place(x=10, y=10)
+        
+    def setup_keymonconfig(self):
+        self.limit_label = ttk.Label(self.tab3, text="Keystroke speed threshold")
+        self.limit_label.place(x=10, y=50)
+        self.limit_entry = ttk.Entry(self.tab3)
+        self.limit_entry.place(x=10, y=70)
+        self.limit_entry.insert(0, self.keymon.limit)
+
+        self.size_label = ttk.Label(self.tab3, text="Keystroke size")
+        self.size_label.place(x=10, y=110)
+        self.size_entry = ttk.Entry(self.tab3)
+        self.size_entry.place(x=10, y=130)
+        self.size_entry.insert(0, self.keymon.size)
+
+        self.save_limit_button = ttk.Button(self.tab3, text="Save", command=self.save_keymonconfig)
+        self.save_limit_button.place(x=10, y=230)
+        
+    def save_keymonconfig(self):
+        limit = int(self.limit_entry.get())
+        size = int(self.size_entry.get())
+        self.keymon.limit = limit
+        self.keymon.size = size
+        self.config_handler.save_int_to_config('KeystrokeMonitoring', 'limit', limit)
+        self.config_handler.save_int_to_config('KeystrokeMonitoring', 'size', size)
+        
+    def toggle_autostart(self):
+        app_name = "SafeUSB"
+        key_data = os.path.realpath(__file__)
+        autostart = self.var.get()
+
+        if autostart:
+            if not self.registry_manager.set_autostart_registry(app_name, key_data):
+                messagebox.showerror("Error", "Failed to set autostart.")
+        else:
+            if not self.registry_manager.set_autostart_registry(app_name, key_data, autostart=False):
+                messagebox.showerror("Error", "Failed to remove autostart.")
+
+        self.config_handler.save_to_config('Autostart', 'run_at_startup', str(autostart))
 
     def register_selected_devices(self):
         selected_items = self.deviceTable.selection()
@@ -198,6 +254,77 @@ class App:
                     self.keyboard_block_status_label.config(text="Keyboard Unblocked", fg="green")
         self.root.after(100, self.update_gui)  # Schedule the next call to this function
      
+class ConfigHandler:
+    def __init__(self, config_file):
+        self.config_file = config_file
+        self.config = configparser.ConfigParser()
+    
+        if not os.path.exists(self.config_file):
+            self.create_default_config()
+            
+    def create_default_config(self):
+        self.config['KeystrokeMonitoring'] = {'limit': '30', 'size': '25'}
+        with open(self.config_file, 'w') as configfile:
+            self.config.write(configfile)
+
+    def save_to_config(self, section, option, value):
+        self.config[section] = {option: value}
+        with open(self.config_file, 'w') as configfile:
+            self.config.write(configfile)
+
+    def load_from_config(self, section, option):
+        self.config.read(self.config_file)
+        return self.config.getboolean(section, option)
+
+    def save_int_to_config(self, section, option, value):
+        if not self.config.has_section(section):
+            self.config.add_section(section)
+        self.config.set(section, option, str(value))
+        with open(self.config_file, 'w') as configfile:
+            self.config.write(configfile)
+
+    def load_int_from_config(self, section, option):
+        self.config.read(self.config_file)
+        if self.config.has_section(section):
+            return self.config.getint(section, option)
+        else:
+            return None
+
+class RegistryManager:    
+    def set_autostart_registry(self, app_name, key_data, autostart: bool = True) -> bool:
+        with winreg.OpenKey(
+                key=winreg.HKEY_CURRENT_USER,
+                sub_key=r'Software\Microsoft\Windows\CurrentVersion\Run',
+                reserved=0,
+                access=winreg.KEY_ALL_ACCESS,
+        ) as key:
+            try:
+                if autostart:
+                    winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, key_data)
+                else:
+                    winreg.DeleteValue(key, app_name)
+            except OSError:
+                return False
+        return True
+
+    def check_autostart_registry(self, value_name):
+        with winreg.OpenKey(
+                key=winreg.HKEY_CURRENT_USER,
+                sub_key=r'Software\Microsoft\Windows\CurrentVersion\Run',
+                reserved=0,
+                access=winreg.KEY_ALL_ACCESS,
+        ) as key:
+            idx = 0
+            while idx < 1_000:     # Max 1.000 values
+                try:
+                    key_name, _, _ = winreg.EnumValue(key, idx)
+                    if key_name == value_name:
+                        return True
+                    idx += 1
+                except OSError:
+                    break
+        return False
+
 class USBEnumerator:
     def __init__(self, queue, keymon, intrusion_handler, callback=None):
         self.queue = queue
@@ -342,10 +469,11 @@ class IntrusionHandler:
         self.queue.put(('keyboard_unblocked',)) 
 
 class KeystrokeMonitoring:
-    def __init__(self, intrusion_handler):
+    def __init__(self, intrusion_handler, config_handler):
         self.intrusion_handler = intrusion_handler # Create an instance of IntrusionHandler
-        self.limit = 30
-        self.size = 25
+        self.config_handler = config_handler
+        self.limit = self.config_handler.load_int_from_config('KeystrokeMonitoring', 'limit')
+        self.size = self.config_handler.load_int_from_config('KeystrokeMonitoring', 'size')
         self.speed = 0
         self.prev = -1
         self.i = 0
@@ -434,11 +562,13 @@ class KeystrokeMonitoring:
 if __name__ == "__main__":
     multiprocessing.freeze_support() #freeze_support must be enabled when compiling to exe with pyinstaller with multiprocessing
     root = tk.Tk()
+    config_handler = ConfigHandler('config.ini')
+    registry_manager = RegistryManager()
     q = multiprocessing.Queue()
     handler = IntrusionHandler(q)
-    keymon = KeystrokeMonitoring(handler)
+    keymon = KeystrokeMonitoring(handler, config_handler)
     usb_enumerator = USBEnumerator(q, keymon, handler)
-    app = App(root, usb_enumerator, handler, keymon)
+    app = App(root, usb_enumerator, handler, keymon, config_handler, registry_manager)
     root.protocol('WM_DELETE_WINDOW', app.hide_window)
     
     app.update_gui()  # Start the periodic call to the function
