@@ -20,11 +20,12 @@ import json
 import winreg
 import configparser
 
-APP_ICON = "favicon.ico"
-WARNING_ICON = "warning.png"
-INFO_ICON = "information.png" 
-SAFEDEVICES = "safe.txt"
-KEYWORDS = "keywords.txt"
+APP_ICON = r"favicon.ico"
+WARNING_ICON = r"warning.png"
+INFO_ICON = r"information.png" 
+SAFEDEVICES = r"safe.txt"
+KEYWORDS = r"keywords.txt"
+CONFIG_FILE = r"config.ini"
 
 class App:
     def __init__(self, root, usb_enumerator, intrusion_handler, keymon, config_handler, registry_manager):
@@ -562,7 +563,7 @@ class KeystrokeMonitoring:
 if __name__ == "__main__":
     multiprocessing.freeze_support() #freeze_support must be enabled when compiling to exe with pyinstaller with multiprocessing
     root = tk.Tk()
-    config_handler = ConfigHandler('config.ini')
+    config_handler = ConfigHandler(CONFIG_FILE)
     registry_manager = RegistryManager()
     q = multiprocessing.Queue()
     handler = IntrusionHandler(q)
