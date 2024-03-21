@@ -132,7 +132,7 @@ class App:
         
     def toggle_autostart(self):
         app_name = "SafeUSB"
-        key_data = os.path.realpath(__file__)
+        key_data = sys.executable
         autostart = self.var.get()
 
         if autostart:
