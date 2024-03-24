@@ -20,12 +20,12 @@ import json
 import winreg
 import configparser
 
-APP_ICON = r"favicon.ico"
-WARNING_ICON = r"warning.png"
-INFO_ICON = r"information.png" 
-SAFEDEVICES = r"safe.txt"
-KEYWORDS = r"keywords.txt"
-CONFIG_FILE = r"config.ini"
+APP_ICON = r"safeusb-data\images\favicon.ico"
+WARNING_ICON = r"safeusb-data\images\warning.png"
+INFO_ICON = r"safeusb-data\images\information.png" 
+SAFEDEVICES = r"safeusb-data\safe.txt"
+KEYWORDS = r"safeusb-data\keywords.txt"
+CONFIG_FILE = r"safeusb-data\config.ini"
 
 class App:
     def __init__(self, root, usb_enumerator, intrusion_handler, keymon, config_handler, registry_manager):
@@ -265,7 +265,7 @@ class ConfigHandler:
             
     def create_default_config(self):
         self.config['KeystrokeMonitoring'] = {'limit': '30', 'size': '25'}
-        with open(self.config_file, 'w') as configfile:
+        with open(self.config_file, 'x+') as configfile:
             self.config.write(configfile)
 
     def save_to_config(self, section, option, value):
@@ -366,7 +366,7 @@ class USBEnumerator:
 
     def load_registered_devices(self):
         if not os.path.isfile(SAFEDEVICES):
-            open(SAFEDEVICES, 'w').close()
+            open(SAFEDEVICES, 'x+').close()
         with open(SAFEDEVICES, 'r') as f:
             registered_devices = [line.strip().split(',') for line in f]
         if not registered_devices:
@@ -490,7 +490,7 @@ class KeystrokeMonitoring:
 
         # Check if file exists
         if not os.path.exists(filename):
-            with open(filename, 'w') as f:
+            with open(filename, 'x+') as f:
                 json.dump(default_keywords, f)
             return default_keywords
 
