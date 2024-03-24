@@ -1,4 +1,3 @@
-from cgitb import text
 import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.font as tkFont
@@ -20,12 +19,15 @@ import json
 import winreg
 import configparser
 
-APP_ICON = r"safeusb-data\images\favicon.ico"
-WARNING_ICON = r"safeusb-data\images\warning.png"
-INFO_ICON = r"safeusb-data\images\information.png" 
-SAFEDEVICES = r"safeusb-data\safe.txt"
-KEYWORDS = r"safeusb-data\keywords.txt"
-CONFIG_FILE = r"safeusb-data\config.ini"
+BUNDLE_DIR = getattr(sys, '_MEIPASS', os.path.abspath(os.path.dirname(__file__)))
+APP_ICON = os.path.abspath(os.path.join(BUNDLE_DIR, r"safeusb-data\favicon.ico"))
+WARNING_ICON = os.path.abspath(os.path.join(BUNDLE_DIR, r"safeusb-data\warning.png"))
+INFO_ICON = os.path.abspath(os.path.join(BUNDLE_DIR, r"safeusb-data\information.png")) 
+
+CWD = os.path.abspath(os.path.dirname(sys.executable))
+SAFEDEVICES = os.path.join(CWD, "safe.txt")
+KEYWORDS = os.path.join(CWD, "keywords.txt")
+CONFIG_FILE = os.path.join(CWD, "config.ini")
 
 class App:
     def __init__(self, root, usb_enumerator, intrusion_handler, keymon, config_handler, registry_manager):

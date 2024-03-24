@@ -8,3 +8,8 @@ output/safeusb.exe
 output/warning.png
 config.ini
 output/SafeUSB.exe - Shortcut.lnk
+output/safeusb-data/images/warning.png
+output/safeusb-data/images/information.png
+output/safeusb-data/images/favicon.ico
+output/safeusb-data/safe.txt
+output/safeusb-data/keywords.txt
