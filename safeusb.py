@@ -228,9 +228,10 @@ class App:
     def restart_program(self):
         if self.usb_enumerator.p is not None and self.usb_enumerator.p.is_alive():
             self.usb_enumerator.p.terminate()
+            self.usb_enumerator.p.join()  # Ensure the process has time to terminate
         root.destroy()
         python = sys.executable
-        subprocess.call([python] + sys.argv)
+        subprocess.run([python] + sys.argv)
            
     def update_gui(self):
         while not q.empty():
