@@ -231,8 +231,9 @@ class App:
             self.usb_enumerator.p.join()  # Ensure the process has time to terminate
         root.destroy()
         python = sys.executable
-        subprocess.run([python] + sys.argv)
-           
+        subprocess.Popen([python] + sys.argv)
+        sys.exit()
+
     def update_gui(self):
         while not q.empty():
             action, *data = q.get()
