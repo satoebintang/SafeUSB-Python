@@ -25,7 +25,7 @@ WARNING_ICON = os.path.abspath(os.path.join(BUNDLE_DIR, r"safeusb-data\warning.p
 INFO_ICON = os.path.abspath(os.path.join(BUNDLE_DIR, r"safeusb-data\information.png")) 
 
 CWD = os.path.abspath(os.path.dirname(sys.executable))
-SAFEDEVICES = os.path.join(CWD, "safe.txt")
+SAFE_DATABASE = os.path.join(CWD, "safedatabase.txt")
 KEYWORDS = os.path.join(CWD, "keywords.txt")
 CONFIG_FILE = os.path.join(CWD, "config.ini")
 
@@ -37,7 +37,7 @@ class App:
         self.keymon = keymon
         self.config_handler = config_handler
         self.registry_manager = registry_manager
-        self.var = tk.IntVar()
+        self.startup_checkbox = tk.IntVar()
         self.setup_window()
         self.setup_tab_control()
         self.setup_device_table()
@@ -102,11 +102,11 @@ class App:
         
     def setup_autostartcheckbox(self):
         try:
-            self.var.set(self.config_handler.load_from_config('Autostart', 'run_at_startup'))
+            self.startup_checkbox.set(self.config_handler.load_from_config('Autostart', 'run_at_startup'))
         except (configparser.NoSectionError, configparser.NoOptionError):
-            self.var.set(self.registry_manager.check_autostart_registry("SafeUSB"))
+            self.startup_checkbox.set(self.registry_manager.check_autostart_registry("SafeUSB"))
 
-        self.chk = ttk.Checkbutton(self.tab3, text="Run at startup", variable=self.var, command=self.toggle_autostart)
+        self.chk = ttk.Checkbutton(self.tab3, text="Run at startup", variable=self.startup_checkbox, command=self.toggle_autostart)
         self.chk.place(x=10, y=10)
         
     def setup_keymonconfig(self):
@@ -136,7 +136,7 @@ class App:
     def toggle_autostart(self):
         app_name = "SafeUSB"
         key_data = sys.executable
-        autostart = self.var.get()
+        autostart = self.startup_checkbox.get()
 
         if autostart:
             if not self.registry_manager.set_autostart_registry(app_name, key_data):
@@ -153,7 +153,7 @@ class App:
             messagebox.showwarning("Warning", "No device selected.")
             return
 
-        with open(SAFEDEVICES, 'r') as f:
+        with open(SAFE_DATABASE, 'r') as f:
             registered_devices = [line.strip().split(',') for line in f]
 
         for item in selected_items:
@@ -171,7 +171,7 @@ class App:
                 if any(rd[0] == device_name and rd[1] == device_class and rd[2] == device_id for rd in registered_devices):
                     messagebox.showwarning("Warning", f"Device {device_name} is already registered.")
                     continue
-                self.usb_enumerator.write_to_file(device_name, device_class, device_id)
+                self.usb_enumerator.write_to_database(device_name, device_class, device_id)
                 device['Status'] = 'Safe'  # Update the 'Status' key in the device dictionary
                 self.deviceTable.set(item, 'Status', 'Safe')
                 self.deviceTable.item(item, tags=('Safe',))
@@ -187,7 +187,7 @@ class App:
 
         for item in selected_items:
             device_name, device_class, device_id = self.registeredDeviceTable.item(item, "values")
-            self.usb_enumerator.remove_from_file(device_name, device_class, device_id)
+            self.usb_enumerator.remove_from_database(device_name, device_class, device_id)
             self.registeredDeviceTable.delete(item)
         
         messagebox.showwarning("Info", "Device(s) unregistered, SafeUSB will restart")
@@ -196,9 +196,9 @@ class App:
     def refresh_registered_device(self):    
         for i in self.registeredDeviceTable.get_children():
             self.registeredDeviceTable.delete(i)
-        if not os.path.isfile(SAFEDEVICES):
-            open(SAFEDEVICES, 'w').close()
-        with open(SAFEDEVICES, 'r') as f:
+        if not os.path.isfile(SAFE_DATABASE):
+            open(SAFE_DATABASE, 'w').close()
+        with open(SAFE_DATABASE, 'r') as f:
             for line in f:
                 device_name, device_class, device_id = line.strip().split(',')
                 self.registeredDeviceTable.insert('', 'end', values=(device_name, device_class, device_id))   
@@ -359,7 +359,7 @@ class USBEnumerator:
                 self.start_keystroke_monitoring()
             else:
                 device_status = 'Safe'
-                self.write_to_file(device_name, device_class, device_id)
+                self.write_to_database(device_name, device_class, device_id)
 
             device['Status'] = device_status  # Store the status in the device dictionary
 
@@ -369,9 +369,9 @@ class USBEnumerator:
         self.check_unregistered_devices()
 
     def load_registered_devices(self):
-        if not os.path.isfile(SAFEDEVICES):
-            open(SAFEDEVICES, 'x+').close()
-        with open(SAFEDEVICES, 'r') as f:
+        if not os.path.isfile(SAFE_DATABASE):
+            open(SAFE_DATABASE, 'x+').close()
+        with open(SAFE_DATABASE, 'r') as f:
             registered_devices = [line.strip().split(',') for line in f]
         if not registered_devices:
             messagebox.showinfo("Enumerating Device", "SafeUSB is enumerating device for the first time.")
@@ -391,7 +391,7 @@ class USBEnumerator:
                     self.start_keystroke_monitoring()
                 else:
                     device_status = 'Safe'
-                    self.write_to_file(device_name, device_class, device_id)
+                    self.write_to_database(device_name, device_class, device_id)
 
                 device['Status'] = device_status  # Store the status in the device dictionary
                 self.queue.put(('connect', device_name, device_class, device_status, device_id))
@@ -420,35 +420,35 @@ class USBEnumerator:
         self.keystroke_monitoring_started = False
         self.queue.put(('keystroke_monitoring_stopped',))  
 
-    def write_to_file(self, device_name, device_class, device_id):
-        devices = self.read_current_contents()
+    def write_to_database(self, device_name, device_class, device_id):
+        devices = self.read_database()
         new_device = f"{device_name},{device_class},{device_id}\n"
         if new_device not in devices:
-            self.append_to_file(new_device)
+            self.append_to_database(new_device)
             if self.callback:
                 self.callback()
                 
-    def remove_from_file(self, device_name, device_class, device_id):
-        devices = self.read_current_contents()
+    def remove_from_database(self, device_name, device_class, device_id):
+        devices = self.read_database()
         device = f"{device_name},{device_class},{device_id}\n"
         if device in devices:
             devices.remove(device)
-            with open(SAFEDEVICES, 'w') as f:
+            with open(SAFE_DATABASE, 'w') as f:
                 f.writelines(devices)
             if self.callback:
                 self.callback()
 
-    def read_current_contents(self):
-        if not os.path.isfile(SAFEDEVICES):
-            open(SAFEDEVICES, 'w').close()
-        with open(SAFEDEVICES, 'r') as f:
+    def read_database(self):
+        if not os.path.isfile(SAFE_DATABASE):
+            open(SAFE_DATABASE, 'w').close()
+        with open(SAFE_DATABASE, 'r') as f:
             devices = f.readlines()
         return devices
 
-    def append_to_file(self, new_device):
-        if not os.path.isfile(SAFEDEVICES):
-            open(SAFEDEVICES, 'w').close()
-        with open(SAFEDEVICES, 'a') as f:
+    def append_to_database(self, new_device):
+        if not os.path.isfile(SAFE_DATABASE):
+            open(SAFE_DATABASE, 'w').close()
+        with open(SAFE_DATABASE, 'a') as f:
             f.write(new_device)
 
 class IntrusionHandler:
