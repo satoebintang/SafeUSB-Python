@@ -18,6 +18,9 @@ import keyboard
 import json
 import winreg
 import configparser
+import time
+import win32evtlog
+import win32evtlogutil
 
 BUNDLE_DIR = getattr(sys, '_MEIPASS', os.path.abspath(os.path.dirname(__file__)))
 APP_ICON = os.path.abspath(os.path.join(BUNDLE_DIR, r"safeusb-data\favicon.ico"))
@@ -464,6 +467,14 @@ class IntrusionHandler:
         intrusionWarning.send()
         messagebox.showwarning("Intrusion Detected by SafeUSB", "Possible HID keystroke injection by BadUSB detected.\n\nAll keyboard input will be blocked.\n\nTo unblock, register any unregistered device (if you believe this warning is a false positive) or immediately check your physical USB port and disconnect any malicious device")
 
+    def write_to_event_log(self):
+        # Define the event source detailspowershell
+        source = 'SafeUSB'
+        event_id = 1337  # The security ID structure is invalid.
+        descr = ["HID keystroke injection by BadUSB detected"]
+        # Write to the event log
+        win32evtlogutil.ReportEvent(source, event_id, eventType=win32evtlog.EVENTLOG_WARNING_TYPE, strings=descr, data=None)
+    
     def block_keyboard(self):
         for i in range(150):
             keyboard.block_key(i) 
@@ -552,6 +563,7 @@ class KeystrokeMonitoring:
 
     def detect_intrusion(self):
         if (self.speedIntrusion or self.contentIntrusion) and not self.intrusion_handler.notification_sent:
+            self.intrusion_handler.write_to_event_log()
             self.intrusion_handler.block_keyboard()
             self.intrusion_handler.send_intrusion_warning()
             self.intrusion_handler.notification_sent = True
