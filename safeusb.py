@@ -135,6 +135,8 @@ class App:
         self.keymon.size = size
         self.config_handler.save_int_to_config('KeystrokeMonitoring', 'limit', limit)
         self.config_handler.save_int_to_config('KeystrokeMonitoring', 'size', size)
+        messagebox.showwarning("Info", "Keystroke Monitoring configuration changed, SafeUSB will restart")
+        self.restart_program()
         
     def toggle_autostart(self):
         app_name = "SafeUSB"
