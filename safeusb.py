@@ -497,13 +497,13 @@ class KeystrokeMonitoring:
         self.i = 0
         self.speedIntrusion = False
         self.history = [self.limit+1] * self.size
-        self.keylogged = ""
+        self.keylogged = "".lower()
         self.keyWords = self.read_keywords()
         self.contentIntrusion = False
     
     def read_keywords(self):
         filename = KEYWORDS
-        default_keywords = ["POWERSHELL", "CMD.EXE", "USER", "HOSTNAME", "TASK", "NEW-OBJECT"]
+        default_keywords = ["POWERSHELL", "CMD.EXE", "USER", "HOSTNAME", "TASK", "NEWOem_MinusOBJECT", "LwinX", "LwinR", "LcontrolLmenuDelete"]
 
         # Check if file exists
         if not os.path.exists(filename):
@@ -538,7 +538,7 @@ class KeystrokeMonitoring:
 
     def detect_keywords(self):
         for word in self.keyWords:
-            if word in self.keylogged.upper():
+            if word in self.keylogged:
                 print(f"[*] Key Words Detected: [{word}]")
                 self.contentIntrusion = True
                 self.keylogged = ""
