@@ -273,7 +273,7 @@ class ConfigHandler:
             self.create_default_config()
             
     def create_default_config(self):
-        self.config['KeystrokeMonitoring'] = {'limit': '30', 'size': '25'}
+        self.config['KeystrokeMonitoring'] = {'limit': '30', 'size': '10'}
         with open(self.config_file, 'x+') as configfile:
             self.config.write(configfile)
 
