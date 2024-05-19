@@ -21,6 +21,7 @@ import configparser
 import time
 import win32evtlog
 import win32evtlogutil
+import re
 
 BUNDLE_DIR = getattr(sys, '_MEIPASS', os.path.abspath(os.path.dirname(__file__)))
 APP_ICON = os.path.abspath(os.path.join(BUNDLE_DIR, r"safeusb-data\favicon.ico"))
@@ -128,31 +129,46 @@ class App:
         self.save_limit_button = ttk.Button(self.tab3, text="Save", command=self.save_keymonconfig)
         self.save_limit_button.place(x=10, y=230)
         
-        self.last_valid_limit = self.keymon.limit
-        self.last_valid_size = self.keymon.size
-        
     def save_keymonconfig(self):
-        try:
-            limit = int(self.limit_entry.get())
-            size = int(self.size_entry.get())
+        limit = self.limit_entry.get()
+        size = self.size_entry.get()
 
-            if limit <= 0 or size <= 0:
-                raise ValueError("Both values must be positive integers.")
-
-            self.keymon.limit = limit
-            self.keymon.size = size
-            self.config_handler.save_int_to_config('KeystrokeMonitoring', 'limit', limit)
-            self.config_handler.save_int_to_config('KeystrokeMonitoring', 'size', size)
-            self.last_valid_limit = limit
-            self.last_valid_size = size
-            messagebox.showinfo("Info", "Keystroke Monitoring configuration saved. SafeUSB will restart.")
-            self.restart_program()
-        except ValueError as e:
-            messagebox.showerror("Error", f"Invalid input: {e}")
+        if not self.validate_positive_integer(limit):
+            messagebox.showerror("Invalid Input", "Keystroke speed threshold must be a positive integer.")
             self.limit_entry.delete(0, tk.END)
-            self.limit_entry.insert(0, self.last_valid_limit)
+            self.limit_entry.insert(0, self.keymon.limit)
+            return
+
+        if not self.validate_positive_integer(size):
+            messagebox.showerror("Invalid Input", "Keystroke size must be a positive integer.")
             self.size_entry.delete(0, tk.END)
-            self.size_entry.insert(0, self.last_valid_size)
+            self.size_entry.insert(0, self.keymon.size)
+            return
+
+        limit = int(limit)
+        size = int(size)
+
+        if not (1 <= limit <= 1000):
+            messagebox.showerror("Invalid Input", "Keystroke speed threshold must be between 1 and 1000.")
+            self.limit_entry.delete(0, tk.END)
+            self.limit_entry.insert(0, self.keymon.limit)
+            return
+
+        if not (1 <= size <= 1000):
+            messagebox.showerror("Invalid Input", "Keystroke size must be between 1 and 1000.")
+            self.size_entry.delete(0, tk.END)
+            self.size_entry.insert(0, self.keymon.size)
+            return
+
+        self.keymon.limit = limit
+        self.keymon.size = size
+        self.config_handler.save_int_to_config('KeystrokeMonitoring', 'limit', limit)
+        self.config_handler.save_int_to_config('KeystrokeMonitoring', 'size', size)
+        messagebox.showwarning("Info", "Keystroke Monitoring configuration changed, SafeUSB will restart")
+        self.restart_program()
+
+    def validate_positive_integer(self, value):
+        return bool(re.match(r'^[1-9]\d*$', value))
         
     def toggle_autostart(self):
         app_name = "SafeUSB"
