@@ -10,7 +10,7 @@ from PIL import Image, ImageTk
 import pyWinhook as pyHook
 import pythoncom
 import multiprocessing
-from notifypy import Notify
+from win11toast import toast
 import os
 import subprocess
 import sys
@@ -209,11 +209,7 @@ class App:
                 self.registeredDeviceTable.insert('', 'end', values=(device_name, device_class, device_id))   
 
     def hide_window(self):
-        runNotify = Notify()
-        runNotify.title = "SafeUSB is active"
-        runNotify.message = "SafeUSB is running in the background"
-        runNotify.icon = INFO_ICON
-        runNotify.send()
+        toast('SafeUSB is active', 'SafeUSB is running in the background', icon=INFO_ICON)
         root.withdraw()
         image=Image.open(APP_ICON)
         menu=(item('Show', self.show_window), item('Quit', self.quit_program))
@@ -462,11 +458,7 @@ class IntrusionHandler:
         self.notification_sent = False
 
     def send_intrusion_warning(self):
-        intrusionWarning = Notify()
-        intrusionWarning.title = "Intrusion Detected"
-        intrusionWarning.message = "HID keystroke injection by BadUSB detected"
-        intrusionWarning.icon = WARNING_ICON
-        intrusionWarning.send()
+        toast('Intrusion Detected', 'HID keystroke injection by BadUSB detected', icon=WARNING_ICON)
         messagebox.showwarning("Intrusion Detected by SafeUSB", "Possible HID keystroke injection by BadUSB detected.\n\nAll keyboard input will be blocked.\n\nTo unblock, register any unregistered device (if you believe this warning is a false positive) or immediately check your physical USB port and disconnect any malicious device")
 
     def write_to_event_log(self):
