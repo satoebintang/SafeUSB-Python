@@ -10,7 +10,7 @@ from PIL import Image, ImageTk
 import pyWinhook as pyHook
 import pythoncom
 import multiprocessing
-from win11toast import toast
+from win11toast import notify
 import os
 import subprocess
 import sys
@@ -128,15 +128,31 @@ class App:
         self.save_limit_button = ttk.Button(self.tab3, text="Save", command=self.save_keymonconfig)
         self.save_limit_button.place(x=10, y=230)
         
+        self.last_valid_limit = self.keymon.limit
+        self.last_valid_size = self.keymon.size
+        
     def save_keymonconfig(self):
-        limit = int(self.limit_entry.get())
-        size = int(self.size_entry.get())
-        self.keymon.limit = limit
-        self.keymon.size = size
-        self.config_handler.save_int_to_config('KeystrokeMonitoring', 'limit', limit)
-        self.config_handler.save_int_to_config('KeystrokeMonitoring', 'size', size)
-        messagebox.showwarning("Info", "Keystroke Monitoring configuration changed, SafeUSB will restart")
-        self.restart_program()
+        try:
+            limit = int(self.limit_entry.get())
+            size = int(self.size_entry.get())
+
+            if limit <= 0 or size <= 0:
+                raise ValueError("Both values must be positive integers.")
+
+            self.keymon.limit = limit
+            self.keymon.size = size
+            self.config_handler.save_int_to_config('KeystrokeMonitoring', 'limit', limit)
+            self.config_handler.save_int_to_config('KeystrokeMonitoring', 'size', size)
+            self.last_valid_limit = limit
+            self.last_valid_size = size
+            messagebox.showinfo("Info", "Keystroke Monitoring configuration saved. SafeUSB will restart.")
+            self.restart_program()
+        except ValueError as e:
+            messagebox.showerror("Error", f"Invalid input: {e}")
+            self.limit_entry.delete(0, tk.END)
+            self.limit_entry.insert(0, self.last_valid_limit)
+            self.size_entry.delete(0, tk.END)
+            self.size_entry.insert(0, self.last_valid_size)
         
     def toggle_autostart(self):
         app_name = "SafeUSB"
@@ -209,7 +225,7 @@ class App:
                 self.registeredDeviceTable.insert('', 'end', values=(device_name, device_class, device_id))   
 
     def hide_window(self):
-        toast('SafeUSB is active', 'SafeUSB is running in the background', icon=INFO_ICON)
+        notify('SafeUSB is active', 'SafeUSB is running in the background', icon=INFO_ICON)
         root.withdraw()
         image=Image.open(APP_ICON)
         menu=(item('Show', self.show_window), item('Quit', self.quit_program))
@@ -458,7 +474,7 @@ class IntrusionHandler:
         self.notification_sent = False
 
     def send_intrusion_warning(self):
-        toast('Intrusion Detected', 'HID keystroke injection by BadUSB detected', icon=WARNING_ICON)
+        notify('Intrusion Detected', 'HID keystroke injection by BadUSB detected', icon=WARNING_ICON)
         messagebox.showwarning("Intrusion Detected by SafeUSB", "Possible HID keystroke injection by BadUSB detected.\n\nAll keyboard input will be blocked.\n\nTo unblock, register any unregistered device (if you believe this warning is a false positive) or immediately check your physical USB port and disconnect any malicious device")
 
     def write_to_event_log(self):
