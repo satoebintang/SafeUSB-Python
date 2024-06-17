@@ -253,7 +253,7 @@ class App:
 
     def quit_program(self, icon, item):
         icon.stop()
-        if self.usb_enumerator.p is not None and self.usb_enumerator.keystroke_monitoring_process.is_alive():
+        if self.usb_enumerator.keystroke_monitoring_process is not None and self.usb_enumerator.keystroke_monitoring_process.is_alive():
             self.usb_enumerator.keystroke_monitoring_process.terminate()
         root.destroy()
         
