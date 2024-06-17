@@ -18,6 +18,7 @@ import keyboard
 import json
 import winreg
 import configparser
+import time
 import win32evtlog
 import win32evtlogutil
 import re
@@ -253,14 +254,14 @@ class App:
 
     def quit_program(self, icon, item):
         icon.stop()
-        if self.usb_enumerator.p is not None and self.usb_enumerator.keystroke_monitoring_process.is_alive():
-            self.usb_enumerator.keystroke_monitoring_process.terminate()
+        if self.usb_enumerator.p is not None and self.usb_enumerator.p.is_alive():
+            self.usb_enumerator.p.terminate()
         root.destroy()
         
     def restart_program(self):
-        if self.usb_enumerator.keystroke_monitoring_process is not None and self.usb_enumerator.keystroke_monitoring_process.is_alive():
-            self.usb_enumerator.keystroke_monitoring_process.terminate()
-            self.usb_enumerator.keystroke_monitoring_process.join()  # Ensure the process has time to terminate
+        if self.usb_enumerator.p is not None and self.usb_enumerator.p.is_alive():
+            self.usb_enumerator.p.terminate()
+            self.usb_enumerator.p.join()  # Ensure the process has time to terminate
         root.destroy()
         python = sys.executable
         subprocess.Popen([python] + sys.argv)
@@ -370,11 +371,11 @@ class USBEnumerator:
         self.intrusion_handler = intrusion_handler
         self.usb_monitor = USBMonitor()
         self.keystroke_monitoring_started = False
-        self.keystroke_monitoring_process = None
+        self.p = None
         self.devices = {}  # Store the current devices
         self.usb_enum()
         self.usb_monitor.start_monitoring(on_connect=self.usb_enum, on_disconnect=self.usb_enum)
-        #self.start_keystroke_monitoring()
+        self.start_keystroke_monitoring()
         
     def usb_enum(self, *args):        
         new_devices = self.usb_monitor.get_available_devices()
@@ -388,8 +389,8 @@ class USBEnumerator:
             if any(rd[0] == device_name and rd[1] == device_class and rd[2] == device_id for rd in registered_devices):
                 device_status = 'Safe'
             elif device_class == 'HIDClass':
+                device_status = 'Unregistered'
                 self.start_keystroke_monitoring()
-                device_status = 'Unregistered'                
             else:
                 device_status = 'Safe'
                 self.write_to_database(device_name, device_class, device_id)
@@ -420,8 +421,8 @@ class USBEnumerator:
                 if any(rd[0] == device_name and rd[1] == device_class and rd[2] == device_id for rd in registered_devices):
                     device_status = 'Safe'
                 elif device_class == 'HIDClass':
-                    self.start_keystroke_monitoring()
                     device_status = 'Unregistered'
+                    self.start_keystroke_monitoring()
                 else:
                     device_status = 'Safe'
                     self.write_to_database(device_name, device_class, device_id)
@@ -449,8 +450,8 @@ class USBEnumerator:
             self.intrusion_handler.unblock_keyboard()
 
     def terminate_keystroke_monitoring(self):
-        if self.keystroke_monitoring_process is not None and self.keystroke_monitoring_process.is_alive():
-            self.keystroke_monitoring_process.terminate()
+        if self.p is not None and self.p.is_alive():
+            self.p.terminate()
         self.keystroke_monitoring_started = False
         self.queue.put(('keystroke_monitoring_stopped',)) 
 
@@ -491,6 +492,7 @@ class IntrusionHandler:
         self.notification_sent = False
 
     def send_intrusion_warning(self):
+        #notify('Intrusion Detected', 'HID keystroke injection by BadUSB detected', icon=WARNING_ICON)
         messagebox.showwarning("Intrusion Detected by SafeUSB", "Possible HID keystroke injection by BadUSB detected.\n\nAll keyboard input will be blocked.\n\nTo unblock, register any unregistered device (if you believe this warning is a false positive) or immediately check your physical USB port and disconnect any malicious device")
         notify('Intrusion Detected', 'HID keystroke injection by BadUSB detected', icon=WARNING_ICON)
 
