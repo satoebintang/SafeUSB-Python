@@ -91,7 +91,7 @@ class App:
         self.registeredDeviceTable = self.setup_table(self.tab2, ('Device Name', 'Device Class', 'Device ID'), 657, 10)
 
     def setup_status_labels(self):
-        self.keystroke_status_label = tk.Label(self.root, text="Keystroke Monitoring: Stopped", fg="grey")
+        self.keystroke_status_label = tk.Label(self.root, text="Keystroke Monitoring: Stopped", fg="green")
         self.keystroke_status_label.place(x=320, y=253)
 
         self.keyboard_block_status_label = tk.Label(self.root, text="Keyboard Unblocked", fg="green")
