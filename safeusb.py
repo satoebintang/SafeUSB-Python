@@ -376,7 +376,6 @@ class USBEnumerator:
         self.usb_monitor.start_monitoring(on_connect=self.usb_enum, on_disconnect=self.usb_enum)
         
     def usb_enum(self, *args):
-        self.start_keystroke_monitoring()        
         new_devices = self.usb_monitor.get_available_devices()
         registered_devices = self.load_registered_devices()
 
